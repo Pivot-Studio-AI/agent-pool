@@ -33,7 +33,7 @@ export function FileManifest({ files, conflicts = [] }: FileManifestProps) {
                 className="flex items-center gap-2 py-1"
               >
                 <FileCode size={14} className="text-text-muted shrink-0" />
-                <span className="text-sm text-text-secondary font-mono truncate">
+                <span className="text-sm text-text-secondary truncate">
                   {file}
                 </span>
                 {conflict && (

@@ -19,7 +19,7 @@ export function FileTree({ files, onFileClick }: FileTreeProps) {
           onClick={() => onFileClick(file.path)}
           className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-border/30 transition-colors group"
         >
-          <span className="text-xs text-text-secondary font-mono truncate flex-1">
+          <span className="text-xs text-text-secondary truncate flex-1">
             {file.path}
           </span>
           <span className="flex items-center gap-1.5 shrink-0 text-xs">

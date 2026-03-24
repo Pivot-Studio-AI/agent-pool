@@ -13,7 +13,7 @@ export function Shell({ isConnected }: ShellProps) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary font-mono">
+    <div className="min-h-screen bg-bg text-text-primary">
       <Header isConnected={isConnected} />
       <Sidebar />
       <main className="ml-64 pt-14 min-h-screen">
