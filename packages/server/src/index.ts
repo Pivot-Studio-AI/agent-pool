@@ -50,6 +50,17 @@ app.use('/api/v1/slots', slotRouter);
 app.use('/api/v1/daemon', daemonRouter);
 app.use('/api/v1/file-locks', fileLockRouter);
 
+// Serve dashboard static files in production
+const dashboardDist = path.resolve(__dirname, '../../dashboard/dist');
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(dashboardDist));
+  // SPA fallback — serve index.html for non-API routes
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/ws') return next();
+    res.sendFile(path.join(dashboardDist, 'index.html'));
+  });
+}
+
 // Error handler (must be last)
 app.use(errorHandler);
 
