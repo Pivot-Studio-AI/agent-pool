@@ -60,7 +60,7 @@ export function DiffReview({ task }: DiffReviewProps) {
     if (!diffContainerRef.current) return;
     // diff2html generates file headers with the file path
     const fileHeaders = diffContainerRef.current.querySelectorAll('.d2h-file-name');
-    for (const header of fileHeaders) {
+    for (const header of Array.from(fileHeaders)) {
       if (header.textContent?.includes(path)) {
         const fileWrapper = header.closest('.d2h-file-wrapper');
         if (fileWrapper) {

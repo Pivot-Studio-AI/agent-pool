@@ -8,13 +8,15 @@ COPY packages/dashboard/package.json packages/dashboard/
 COPY packages/daemon/package.json packages/daemon/
 RUN npm ci
 
+# Copy shared config needed by all packages
+COPY tsconfig.base.json ./
+
 # Build dashboard
 COPY packages/dashboard/ packages/dashboard/
 RUN npm run build -w packages/dashboard
 
 # Build server
 COPY packages/server/ packages/server/
-COPY tsconfig.base.json ./
 
 # Production stage
 FROM node:20-alpine
