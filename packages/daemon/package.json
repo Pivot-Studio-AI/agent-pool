@@ -1,0 +1,20 @@
+{
+  "name": "@agent-pool/daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "dotenv": "^16.4",
+    "zod": "^3.22"
+  },
+  "devDependencies": {
+    "typescript": "^5.4",
+    "tsx": "^4.7",
+    "vitest": "^1.4"
+  }
+}

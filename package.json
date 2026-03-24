@@ -1,0 +1,19 @@
+{
+  "name": "agent-pool",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w packages/server",
+    "dev:dashboard": "npm run dev -w packages/dashboard",
+    "dev:daemon": "npm run dev -w packages/daemon",
+    "build:server": "npm run build -w packages/server",
+    "build:dashboard": "npm run build -w packages/dashboard",
+    "build:daemon": "npm run build -w packages/daemon",
+    "db:migrate": "npm run migrate -w packages/server",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

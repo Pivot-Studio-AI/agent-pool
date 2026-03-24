@@ -1,0 +1,282 @@
+import { query } from '../db/connection.js';
+import { broadcast } from '../ws/broadcast.js';
+import { createEvent } from './event-service.js';
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type TaskStatus =
+  | 'queued' | 'planning' | 'awaiting_approval' | 'executing'
+  | 'awaiting_review' | 'merging' | 'completed' | 'errored' | 'rejected';
+
+export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface TaskRow {
+  id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  model_tier: string;
+  target_branch: string;
+  parent_task_id: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface CreateTaskData {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  target_branch?: string;
+  model_tier?: string;
+}
+
+export interface ListTasksFilters {
+  status?: TaskStatus | TaskStatus[];
+  /** Alias for status — accepts an array of statuses (used by some routes) */
+  statuses?: string[];
+  limit?: number;
+}
+
+export interface UpdateTaskFields {
+  title?: string;
+  description?: string;
+  priority?: string;
+}
+
+// ─── State Machine ───────────────────────────────────────────────────
+
+const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  queued:             ['planning'],
+  planning:           ['awaiting_approval'],
+  awaiting_approval:  ['planning', 'executing', 'rejected'],
+  executing:          ['awaiting_review', 'errored'],
+  awaiting_review:    ['merging', 'executing', 'rejected'],
+  merging:            ['completed', 'errored'],
+  // Terminal states — no outgoing transitions
+  completed:          [],
+  errored:            [],
+  rejected:           [],
+};
+
+const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected']);
+
+const ALL_STATUSES: Set<string> = new Set([
+  'queued', 'planning', 'awaiting_approval', 'executing',
+  'awaiting_review', 'merging', 'completed', 'errored', 'rejected',
+]);
+
+/**
+ * Map a status transition to its corresponding event type.
+ */
+function eventTypeForTransition(from: TaskStatus, to: TaskStatus): string {
+  if (to === 'planning' && from === 'queued') return 'task_assigned';
+  if (to === 'planning' && from === 'awaiting_approval') return 'plan_rejected';
+  if (to === 'awaiting_approval') return 'plan_submitted';
+  if (to === 'executing' && from === 'awaiting_approval') return 'execution_started';
+  if (to === 'executing' && from === 'awaiting_review') return 'review_changes_requested';
+  if (to === 'awaiting_review') return 'execution_completed';
+  if (to === 'merging') return 'merge_started';
+  if (to === 'completed') return 'task_completed';
+  if (to === 'errored') return 'task_errored';
+  if (to === 'rejected') return 'task_rejected';
+  return 'task_assigned';
+}
+
+// ─── Service ─────────────────────────────────────────────────────────
+
+/**
+ * Create a new task.
+ */
+export async function createTask(data: CreateTaskData): Promise<TaskRow> {
+  const result = await query<TaskRow>(
+    `INSERT INTO tasks (title, description, priority, target_branch, model_tier)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      data.title,
+      data.description ?? '',
+      data.priority ?? 'medium',
+      data.target_branch ?? 'main',
+      data.model_tier ?? 'default',
+    ],
+  );
+
+  const task = result.rows[0];
+
+  await createEvent(task.id, null, 'task_created', {
+    title: task.title,
+    priority: task.priority,
+  });
+
+  broadcast('tasks', 'task.created', task);
+
+  return task;
+}
+
+/**
+ * Get a task by ID. Throws if not found.
+ */
+export async function getTask(id: string): Promise<TaskRow> {
+  const result = await query<TaskRow>('SELECT * FROM tasks WHERE id = $1', [id]);
+
+  if (result.rows.length === 0) {
+    throw new Error(`Task not found: ${id}`);
+  }
+
+  return result.rows[0];
+}
+
+/**
+ * List tasks with optional filters.
+ * Ordered by priority DESC (critical > high > medium > low), then created_at ASC.
+ */
+export async function listTasks(filters: ListTasksFilters = {}): Promise<TaskRow[]> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let paramIdx = 1;
+
+  // Merge status and statuses into a single array
+  let statusList: string[] | undefined;
+  if (filters.statuses && filters.statuses.length > 0) {
+    statusList = filters.statuses;
+  } else if (filters.status) {
+    statusList = Array.isArray(filters.status) ? filters.status : [filters.status];
+  }
+
+  if (statusList && statusList.length > 0) {
+    const placeholders = statusList.map(() => `$${paramIdx++}`);
+    conditions.push(`status IN (${placeholders.join(', ')})`);
+    params.push(...statusList);
+  }
+
+  const limit = filters.limit ?? 100;
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const result = await query<TaskRow>(
+    `SELECT * FROM tasks ${where}
+     ORDER BY
+       CASE priority
+         WHEN 'critical' THEN 0
+         WHEN 'high'     THEN 1
+         WHEN 'medium'   THEN 2
+         WHEN 'low'      THEN 3
+       END ASC,
+       created_at ASC
+     LIMIT $${paramIdx}`,
+    [...params, limit],
+  );
+
+  return result.rows;
+}
+
+/**
+ * Transition a task to a new status. Validates the transition against the state machine.
+ * Throws an Error if the transition is invalid.
+ * Accepts status as a string (validated at runtime) for route compatibility.
+ */
+export async function updateTaskStatus(
+  id: string,
+  newStatus: string,
+  reason?: string,
+): Promise<TaskRow> {
+  if (!ALL_STATUSES.has(newStatus)) {
+    throw new Error(`Invalid status: '${newStatus}'`);
+  }
+
+  const typedStatus = newStatus as TaskStatus;
+  const task = await getTask(id);
+  const allowed = VALID_TRANSITIONS[task.status];
+
+  if (!allowed || !allowed.includes(typedStatus)) {
+    throw new Error(
+      `Invalid transition: cannot move task from '${task.status}' to '${typedStatus}'`,
+    );
+  }
+
+  const isTerminal = TERMINAL_STATES.has(typedStatus);
+
+  const result = await query<TaskRow>(
+    `UPDATE tasks
+     SET status = $1,
+         completed_at = CASE WHEN $2 THEN now() ELSE completed_at END
+     WHERE id = $3
+     RETURNING *`,
+    [typedStatus, isTerminal, id],
+  );
+
+  const updated = result.rows[0];
+
+  const evtType = eventTypeForTransition(task.status, typedStatus);
+  await createEvent(updated.id, null, evtType as any, {
+    from: task.status,
+    to: typedStatus,
+    ...(reason ? { reason } : {}),
+  });
+
+  broadcast('tasks', 'task.updated', updated);
+
+  return updated;
+}
+
+/**
+ * Update non-status fields on a task (title, description, priority).
+ */
+export async function updateTask(id: string, fields: UpdateTaskFields): Promise<TaskRow> {
+  // Ensure the task exists
+  await getTask(id);
+
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+  let paramIdx = 1;
+
+  if (fields.title !== undefined) {
+    setClauses.push(`title = $${paramIdx++}`);
+    params.push(fields.title);
+  }
+
+  if (fields.description !== undefined) {
+    setClauses.push(`description = $${paramIdx++}`);
+    params.push(fields.description);
+  }
+
+  if (fields.priority !== undefined) {
+    setClauses.push(`priority = $${paramIdx++}`);
+    params.push(fields.priority);
+  }
+
+  if (setClauses.length === 0) {
+    return getTask(id);
+  }
+
+  const result = await query<TaskRow>(
+    `UPDATE tasks SET ${setClauses.join(', ')} WHERE id = $${paramIdx} RETURNING *`,
+    [...params, id],
+  );
+
+  const updated = result.rows[0];
+  broadcast('tasks', 'task.updated', updated);
+
+  return updated;
+}
+
+/**
+ * Delete a task. Only allowed if the task is in 'queued' status.
+ */
+export async function deleteTask(id: string): Promise<void> {
+  const task = await getTask(id);
+
+  if (task.status !== 'queued') {
+    throw new Error(`Cannot delete task in '${task.status}' status — only queued tasks can be deleted`);
+  }
+
+  await createEvent(task.id, null, 'task_rejected', {
+    reason: 'Task deleted while queued',
+    title: task.title,
+  });
+
+  await query('DELETE FROM tasks WHERE id = $1', [id]);
+
+  broadcast('tasks', 'task.updated', { id, deleted: true });
+}
