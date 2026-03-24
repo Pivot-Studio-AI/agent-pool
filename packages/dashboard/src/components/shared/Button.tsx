@@ -37,7 +37,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded font-mono font-medium transition-colors',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variantStyles[variant],
         sizeStyles[size],

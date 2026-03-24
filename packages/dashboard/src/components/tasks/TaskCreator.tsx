@@ -34,8 +34,9 @@ export function TaskCreator() {
       setTargetBranch('main');
       setModelTier('default');
       setExpanded(false);
-    } catch {
-      // Could show error toast here
+    } catch (err) {
+      console.error('Failed to create task:', err);
+      alert(`Failed to create task: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export function TaskCreator() {
             onKeyDown={handleKeyDown}
             placeholder="Describe a task..."
             disabled={loading}
-            className="w-full bg-bg border border-border rounded px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors disabled:opacity-50"
+            className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50"
           />
         </div>
 

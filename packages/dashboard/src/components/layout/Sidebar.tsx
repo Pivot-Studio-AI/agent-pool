@@ -22,10 +22,10 @@ function TaskItem({
     <button
       onClick={onClick}
       className={clsx(
-        'w-full text-left px-3 py-2 rounded text-sm transition-colors',
+        'w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all',
         isSelected
-          ? 'bg-accent/10 border border-accent/30'
-          : 'hover:bg-surface border border-transparent'
+          ? 'bg-accent/10 border border-accent/20'
+          : 'hover:bg-surface-hover border border-transparent'
       )}
     >
       <div className="truncate text-text-primary text-xs font-medium">
@@ -88,7 +88,7 @@ export function Sidebar() {
   const recent = getRecentTasks(store);
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-64 bg-surface border-r border-border overflow-y-auto z-20">
+    <aside className="fixed left-0 top-14 bottom-0 w-64 bg-surface/50 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
       <div className="py-3">
         <Section
           title="Needs Attention"
