@@ -8,6 +8,7 @@ import {
   updateTask,
   deleteTask,
 } from '../services/task-service.js';
+import { updateTestResults } from '../services/diff-service.js';
 
 export const taskRouter = Router();
 
@@ -105,6 +106,18 @@ taskRouter.post('/:id/cancel', async (req, res, next) => {
   try {
     const task = await updateTaskStatus(req.params.id, 'cancelled', 'Cancelled by user');
     res.json({ data: task });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /tasks/:id/test-results — Update test results on latest diff
+// ---------------------------------------------------------------------------
+taskRouter.post('/:id/test-results', async (req, res, next) => {
+  try {
+    await updateTestResults(req.params.id, req.body);
+    res.json({ data: { updated: true } });
   } catch (err) {
     next(err);
   }
