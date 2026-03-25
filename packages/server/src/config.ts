@@ -39,4 +39,6 @@ export const config = {
   jwtSecret: parsed.data.JWT_SECRET,
 } as const;
 
+export const MAX_SLOTS = 50;
+
 export type Config = typeof config;
