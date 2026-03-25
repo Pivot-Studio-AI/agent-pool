@@ -10,7 +10,7 @@ export type EventType =
   | 'diff_ready'
   | 'review_approved' | 'review_rejected' | 'review_changes_requested'
   | 'merge_started' | 'merge_completed' | 'merge_failed'
-  | 'task_completed' | 'task_errored' | 'task_rejected'
+  | 'task_completed' | 'task_errored' | 'task_rejected' | 'task_cancelled'
   | 'slot_claimed' | 'slot_released'
   | 'conflict_detected';
 

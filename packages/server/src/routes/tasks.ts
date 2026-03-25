@@ -99,6 +99,18 @@ taskRouter.patch('/:id', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /tasks/:id/cancel — Cancel a task (from any non-terminal state)
+// ---------------------------------------------------------------------------
+taskRouter.post('/:id/cancel', async (req, res, next) => {
+  try {
+    const task = await updateTaskStatus(req.params.id, 'cancelled', 'Cancelled by user');
+    res.json({ data: task });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // DELETE /tasks/:id — Cancel / delete a task (only if queued)
 // ---------------------------------------------------------------------------
 taskRouter.delete('/:id', async (req, res, next) => {

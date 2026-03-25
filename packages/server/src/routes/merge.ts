@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { updateTaskStatus } from '../services/task-service.js';
 import { releaseLocks } from '../services/file-lock-service.js';
 import { createEvent } from '../services/event-service.js';
+import { storeReviewFeedback } from '../services/diff-service.js';
 
 export const mergeRouter = Router();
 
@@ -45,6 +46,10 @@ mergeRouter.post('/:id/merge/reject', async (req, res, next) => {
 mergeRouter.post('/:id/review/request-changes', async (req, res, next) => {
   try {
     const { comments } = requestChangesSchema.parse(req.body);
+
+    // Store feedback on the latest diff so the daemon can retrieve it
+    await storeReviewFeedback(req.params.id, comments);
+
     const task = await updateTaskStatus(req.params.id, 'executing');
     await createEvent({
       task_id: req.params.id,

@@ -21,7 +21,11 @@ interface WhatsAppIncomingMessage {
 interface MessageTaskMapping {
   taskId: string;
   planId?: string;
+  createdAt: number;
 }
+
+const MESSAGE_MAP_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MESSAGE_MAP_MAX_SIZE = 500;
 
 // ─── Client ─────────────────────────────────────────────────────────
 
@@ -108,7 +112,7 @@ export class WhatsAppClient {
 
     const msgId = await this.sendMessage(text);
     if (msgId) {
-      this.messageTaskMap.set(msgId, { taskId: task.id, planId: plan.id });
+      this.trackMessage(msgId, { taskId: task.id, planId: plan.id });
     }
   }
 
@@ -127,7 +131,7 @@ export class WhatsAppClient {
 
     const msgId = await this.sendMessage(text);
     if (msgId) {
-      this.messageTaskMap.set(msgId, { taskId: task.id });
+      this.trackMessage(msgId, { taskId: task.id });
     }
   }
 
@@ -168,14 +172,81 @@ export class WhatsAppClient {
 
     const msgId = await this.sendMessage(text);
     if (msgId) {
-      this.messageTaskMap.set(msgId, { taskId: task.id });
+      this.trackMessage(msgId, { taskId: task.id });
     }
+  }
+
+  // ── Brief / Digest ──────────────────────────────────────────────
+
+  async sendBrief(): Promise<void> {
+    const activeTasks = await listTasks({
+      statuses: ['planning', 'awaiting_approval', 'executing', 'awaiting_review', 'merging'],
+    });
+
+    const queuedTasks = await listTasks({ status: 'queued' });
+
+    // Get tasks completed today
+    const completedTasks = await listTasks({
+      statuses: ['completed'],
+      limit: 50,
+    });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const completedToday = completedTasks.filter(
+      (t) => t.completed_at && new Date(t.completed_at) >= today
+    );
+
+    const needsAttention = activeTasks.filter(
+      (t) => t.status === 'awaiting_approval' || t.status === 'awaiting_review'
+    );
+
+    const executing = activeTasks.filter((t) => t.status === 'executing' || t.status === 'planning');
+
+    const lines: string[] = ['\u{1F4CA} *Agent Pool Brief*', ''];
+
+    if (needsAttention.length > 0) {
+      lines.push(`*Needs Your Attention (${needsAttention.length})*`);
+      for (const t of needsAttention) {
+        const label = t.status === 'awaiting_approval' ? 'plan ready' : 'diff ready';
+        lines.push(`\u2022 "${t.title}" \u2014 ${label}`);
+      }
+      lines.push('');
+    }
+
+    if (executing.length > 0) {
+      lines.push(`*In Progress (${executing.length})*`);
+      for (const t of executing) {
+        lines.push(`\u2022 "${t.title}" \u2014 ${t.status}`);
+      }
+      lines.push('');
+    }
+
+    lines.push(`Queued: ${queuedTasks.length} task${queuedTasks.length !== 1 ? 's' : ''}`);
+    lines.push(`Completed today: ${completedToday.length} task${completedToday.length !== 1 ? 's' : ''}`);
+
+    await this.sendMessage(lines.join('\n'));
   }
 
   // ── Lookup ────────────────────────────────────────────────────────
 
   getTaskForMessage(messageId: string): MessageTaskMapping | undefined {
     return this.messageTaskMap.get(messageId);
+  }
+
+  /**
+   * Track a message-to-task mapping with automatic TTL eviction.
+   */
+  private trackMessage(messageId: string, mapping: Omit<MessageTaskMapping, 'createdAt'>): void {
+    // Evict stale entries
+    const now = Date.now();
+    if (this.messageTaskMap.size >= MESSAGE_MAP_MAX_SIZE) {
+      for (const [id, entry] of this.messageTaskMap) {
+        if (now - entry.createdAt > MESSAGE_MAP_TTL_MS) {
+          this.messageTaskMap.delete(id);
+        }
+      }
+    }
+    this.messageTaskMap.set(messageId, { ...mapping, createdAt: now });
   }
 
   // ── Inbound handling ──────────────────────────────────────────────
@@ -281,6 +352,26 @@ export class WhatsAppClient {
             (t, i) => `${i + 1}. ${t.title} (${t.priority})`,
           );
           await this.sendMessage(`*Queued Tasks (${queuedTasks.length})*\n\n${lines.join('\n')}`);
+          break;
+        }
+
+        case 'BRIEF': {
+          await this.sendBrief();
+          break;
+        }
+
+        case 'CANCEL': {
+          if (!command.taskId) {
+            await this.sendMessage('Usage: CANCEL <task-id>');
+            return;
+          }
+          try {
+            await updateTaskStatus(command.taskId, 'cancelled', 'Cancelled via WhatsApp');
+            await this.sendMessage(`\u{1F6D1} Task cancelled.`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            await this.sendMessage(`Cannot cancel: ${msg}`);
+          }
           break;
         }
 

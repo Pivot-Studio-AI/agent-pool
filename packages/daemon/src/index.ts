@@ -10,7 +10,7 @@ import { config } from './config.js';
 import * as api from './server-client/api.js';
 import { startPolling, startHeartbeat } from './server-client/poller.js';
 import { WorktreePool } from './worktree/pool.js';
-import { spawnAgent, sendToAgent, killAgent } from './agent/spawner.js';
+import { spawnAgent } from './agent/spawner.js';
 import { OutputParser } from './agent/output-parser.js';
 import { extractPlan } from './agent/plan-extractor.js';
 import { AgentMonitor } from './agent/monitor.js';
@@ -19,6 +19,24 @@ import { generateDiff, parseDiffStats } from './git/diff.js';
 import { mergeBranch, pushBranch } from './git/merge.js';
 import { cleanupWorktree } from './worktree/cleanup.js';
 import { ensureRepo } from './git/clone.js';
+import { createCheckpoint, cleanupCheckpoints } from './git/checkpoint.js';
+import { readWorkspaceConfig, runSetup, runTeardown } from './worktree/lifecycle.js';
+
+// ---- Model Routing ----
+
+const MODEL_MAP: Record<string, string> = {
+  fast: 'claude-haiku-4-5-20251001',
+  default: 'claude-sonnet-4-20250514',
+  powerful: 'claude-opus-4-20250514',
+};
+
+/**
+ * Resolve model_tier to an actual model ID.
+ * Falls back to config.defaultModel if tier is unknown.
+ */
+function resolveModel(modelTier: string): string {
+  return MODEL_MAP[modelTier] || config.defaultModel;
+}
 
 // ---- Types ----
 
@@ -356,19 +374,48 @@ async function runAgentLifecycle(
     pullLatest(worktreePath);
     createBranch(worktreePath, branchName, effectiveDefaultBranch);
 
-    // 2. Update task status to planning
+    // 1b. Run workspace setup if configured
+    const wsConfig = readWorkspaceConfig(effectiveRepoPath);
+    if (wsConfig?.setup) {
+      const setupOk = await runSetup(worktreePath, slotNumber, wsConfig);
+      if (!setupOk) {
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Workspace setup failed, continuing anyway...`);
+      }
+    }
+
+    // Check cancellation after setup
+    const postSetupCheck = await api.getTask(taskId);
+    if (postSetupCheck.status === 'cancelled') {
+      console.log(`[lifecycle:${taskId.slice(0, 8)}] Task cancelled during setup.`);
+      return;
+    }
+
+    // 2. Resolve model based on task tier
+    const taskModel = resolveModel(task.model_tier);
+    console.log(`[lifecycle:${taskId.slice(0, 8)}] Model: ${taskModel} (tier: ${task.model_tier})`);
+
+    // 3. Update task status to planning
     await api.updateTaskStatus(taskId, 'planning');
 
-    // 3. Build the plan prompt
+    // 4. Build the plan prompt
     const prompt = buildPlanPrompt(task, effectiveRepoPath);
 
-    // 4. Run planning phase (may loop if plan is rejected)
+    // 4. Run planning phase (may loop if plan is rejected, up to MAX_PLAN_RETRIES)
+    const MAX_PLAN_RETRIES = parseInt(process.env.MAX_PLAN_RETRIES || '3', 10);
     let approved = false;
     let planFileManifest: string[] = [];
+    let currentPlanPrompt = prompt;
 
-    while (!approved && !shuttingDown) {
+    for (let planAttempt = 1; planAttempt <= MAX_PLAN_RETRIES && !shuttingDown; planAttempt++) {
+      // Check if task was cancelled
+      const taskCheck = await api.getTask(taskId);
+      if (taskCheck.status === 'cancelled') {
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Task cancelled during planning.`);
+        return;
+      }
+
       // Spawn agent for planning
-      const planResult = await runPlanningAgent(taskId, worktreePath, prompt);
+      const planResult = await runPlanningAgent(taskId, worktreePath, currentPlanPrompt, taskModel);
 
       if (!planResult) {
         throw new Error('Agent exited without producing a plan');
@@ -381,7 +428,7 @@ async function runAgentLifecycle(
         reasoning: planResult.reasoning,
         estimate: planResult.estimate,
       });
-      console.log(`[lifecycle:${taskId.slice(0, 8)}] Plan submitted (${plan.id})`);
+      console.log(`[lifecycle:${taskId.slice(0, 8)}] Plan submitted (${plan.id}) — attempt ${planAttempt}/${MAX_PLAN_RETRIES}`);
 
       // Update task to awaiting_approval
       await api.updateTaskStatus(taskId, 'awaiting_approval');
@@ -393,49 +440,34 @@ async function runAgentLifecycle(
         approved = true;
         planFileManifest = planResult.fileManifest;
         console.log(`[lifecycle:${taskId.slice(0, 8)}] Plan approved!`);
-      } else if (decision.status === 'rejected' && decision.feedback) {
-        console.log(
-          `[lifecycle:${taskId.slice(0, 8)}] Plan rejected. Feedback: ${decision.feedback}`
-        );
-        // Update task back to planning for another attempt
-        await api.updateTaskStatus(taskId, 'planning');
-        // The prompt will be rebuilt with rejection feedback on next loop iteration
-        // Actually, we need to rebuild the prompt with rejection feedback
-        const rejectionPrompt = buildRejectionPrompt(task, decision.feedback, effectiveRepoPath);
-        // Override prompt for next iteration — we'll just recursively spawn
-        const retryResult = await runPlanningAgent(taskId, worktreePath, rejectionPrompt);
-        if (!retryResult) {
-          throw new Error('Agent exited without producing a revised plan');
-        }
-
-        const retryPlan = await api.submitPlan(taskId, {
-          content: retryResult.content,
-          file_manifest: retryResult.fileManifest,
-          reasoning: retryResult.reasoning,
-          estimate: retryResult.estimate,
-        });
-        console.log(`[lifecycle:${taskId.slice(0, 8)}] Revised plan submitted (${retryPlan.id})`);
-        await api.updateTaskStatus(taskId, 'awaiting_approval');
-
-        const retryDecision = await waitForPlanDecision(taskId);
-        if (retryDecision.status === 'approved') {
-          approved = true;
-          planFileManifest = retryResult.fileManifest;
+        break;
+      } else if (decision.status === 'rejected') {
+        if (decision.feedback && planAttempt < MAX_PLAN_RETRIES) {
+          console.log(
+            `[lifecycle:${taskId.slice(0, 8)}] Plan rejected (attempt ${planAttempt}/${MAX_PLAN_RETRIES}). Feedback: ${decision.feedback}`
+          );
+          await api.updateTaskStatus(taskId, 'planning');
+          currentPlanPrompt = buildRejectionPrompt(task, decision.feedback, effectiveRepoPath);
+          // Loop continues with new prompt
         } else {
-          // Permanently rejected
+          // No feedback or max retries reached — permanently rejected
+          console.log(`[lifecycle:${taskId.slice(0, 8)}] Plan permanently rejected (attempt ${planAttempt}).`);
           await api.updateTaskStatus(taskId, 'rejected');
           return;
         }
-      } else {
-        // Permanently rejected (no feedback)
-        await api.updateTaskStatus(taskId, 'rejected');
-        return;
       }
+    }
+
+    if (!approved) {
+      if (!shuttingDown) {
+        await api.updateTaskStatus(taskId, 'rejected');
+      }
+      return;
     }
 
     if (shuttingDown) return;
 
-    // 5. Acquire file locks
+    // 5. Acquire file locks — abort if we can't get them
     if (planFileManifest.length > 0) {
       try {
         await api.acquireFileLocks(taskId, planFileManifest);
@@ -443,25 +475,56 @@ async function runAgentLifecycle(
           `[lifecycle:${taskId.slice(0, 8)}] Acquired locks on ${planFileManifest.length} file(s)`
         );
       } catch (err) {
-        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Failed to acquire file locks:`, err);
+        const lockErr = err instanceof Error ? err.message : String(err);
+        console.error(`[lifecycle:${taskId.slice(0, 8)}] Failed to acquire file locks: ${lockErr}`);
+        await api.updateTaskStatus(taskId, 'errored', `File locks unavailable: ${lockErr}`);
+        return;
       }
     }
 
     // 6. Execute implementation
     await api.updateTaskStatus(taskId, 'executing');
-    await runExecutionAgent(taskId, worktreePath, task, agentEntry, effectiveRepoPath);
+    await runExecutionAgent(taskId, worktreePath, task, agentEntry, planFileManifest, taskModel, effectiveRepoPath);
 
     if (shuttingDown) return;
+
+    // Check cancellation after execution
+    const postExecCheck = await api.getTask(taskId);
+    if (postExecCheck.status === 'cancelled') {
+      console.log(`[lifecycle:${taskId.slice(0, 8)}] Task cancelled after execution.`);
+      return;
+    }
 
     // 7. Generate and submit diff
     const diffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
     const diffStats = parseDiffStats(diffContent);
+
+    // Run code audit (summary + bug/security/testing check)
+    const auditResult = await runCodeAudit(taskId, worktreePath, diffStats.diffContent, planFileManifest);
+    if (auditResult) {
+      console.log(`[lifecycle:${taskId.slice(0, 8)}] Audit verdict: ${auditResult.audit.verdict}`);
+      if (auditResult.audit.bugs.length > 0) {
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Audit found ${auditResult.audit.bugs.length} potential bug(s)`);
+      }
+      if (auditResult.audit.security.length > 0) {
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Audit found ${auditResult.audit.security.length} security concern(s)`);
+      }
+    }
+
+    // Check plan compliance
+    const compliance = checkPlanCompliance(planFileManifest, diffStats.filesChanged);
+    if (!compliance.compliant) {
+      console.warn(`[lifecycle:${taskId.slice(0, 8)}] Plan compliance drift: unexpected=${(compliance.unexpected as string[]).join(', ')}, missing=${(compliance.missing as string[]).join(', ')}`);
+    }
 
     await api.submitDiff(taskId, {
       diff_content: diffStats.diffContent,
       files_changed: diffStats.filesChanged,
       additions: diffStats.totalAdditions,
       deletions: diffStats.totalDeletions,
+      summary: auditResult?.summary || undefined,
+      compliance,
+      audit: auditResult?.audit || undefined,
     });
     console.log(
       `[lifecycle:${taskId.slice(0, 8)}] Diff submitted: +${diffStats.totalAdditions} -${diffStats.totalDeletions} across ${diffStats.filesChanged.length} file(s)`
@@ -473,77 +536,92 @@ async function runAgentLifecycle(
 
     if (shuttingDown) return;
 
-    if (reviewDecision === 'approved') {
-      // 9. Merge
-      await api.updateTaskStatus(taskId, 'merging');
-      const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
+    // 8b. Review loop — supports multiple rounds of changes.
+    // Round 0 handles the initial review decision; rounds 1..MAX_CHANGE_ROUNDS handle change requests.
+    const MAX_CHANGE_ROUNDS = 3;
+    let currentReviewDecision = reviewDecision;
 
-      if (!mergeResult.success) {
-        console.error(
-          `[lifecycle:${taskId.slice(0, 8)}] Merge failed: ${mergeResult.error}`
-        );
-        await api.updateTaskStatus(taskId, 'errored', mergeResult.error);
+    for (let changeRound = 0; changeRound < MAX_CHANGE_ROUNDS + 1; changeRound++) {
+      if (shuttingDown) return;
+
+      // Check if task was cancelled
+      const currentTask = await api.getTask(taskId);
+      if (currentTask.status === 'cancelled') {
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Task cancelled during review.`);
         return;
       }
 
-      // Push
-      const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
-      if (!pushResult.success) {
-        console.error(
-          `[lifecycle:${taskId.slice(0, 8)}] Push failed: ${pushResult.error}`
-        );
-        await api.updateTaskStatus(taskId, 'errored', pushResult.error);
-        return;
-      }
-
-      await api.updateTaskStatus(taskId, 'completed');
-      console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed and merged!`);
-    } else if (reviewDecision === 'changes_requested') {
-      // Re-spawn agent with change request feedback
-      // For now, we'll handle a single round of changes
-      console.log(`[lifecycle:${taskId.slice(0, 8)}] Changes requested, re-executing...`);
-      await api.updateTaskStatus(taskId, 'executing');
-
-      // Fetch the latest review comments
-      const latestTask = await api.getTask(taskId);
-      await runChangesAgent(taskId, worktreePath, task, agentEntry, effectiveRepoPath);
-
-      // Re-generate diff
-      const newDiffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
-      const newDiffStats = parseDiffStats(newDiffContent);
-      await api.submitDiff(taskId, {
-        diff_content: newDiffStats.diffContent,
-        files_changed: newDiffStats.filesChanged,
-        additions: newDiffStats.totalAdditions,
-        deletions: newDiffStats.totalDeletions,
-      });
-
-      await api.updateTaskStatus(taskId, 'awaiting_review');
-      // After one round of changes, wait for final decision
-      const finalDecision = await waitForReviewDecision(taskId);
-
-      if (finalDecision === 'approved') {
+      if (currentReviewDecision === 'approved') {
+        // Merge
         await api.updateTaskStatus(taskId, 'merging');
         const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
-        if (mergeResult.success) {
-          const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
-          if (pushResult.success) {
-            await api.updateTaskStatus(taskId, 'completed');
-            console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed after changes!`);
-          } else {
-            await api.updateTaskStatus(taskId, 'errored', pushResult.error);
-          }
-        } else {
+
+        if (!mergeResult.success) {
+          console.error(
+            `[lifecycle:${taskId.slice(0, 8)}] Merge failed: ${mergeResult.error}`
+          );
           await api.updateTaskStatus(taskId, 'errored', mergeResult.error);
+          return;
         }
+
+        const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
+        if (!pushResult.success) {
+          console.error(
+            `[lifecycle:${taskId.slice(0, 8)}] Push failed: ${pushResult.error}`
+          );
+          await api.updateTaskStatus(taskId, 'errored', pushResult.error);
+          return;
+        }
+
+        await api.updateTaskStatus(taskId, 'completed');
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed and merged!`);
+        return;
+      } else if (currentReviewDecision === 'changes_requested') {
+        if (changeRound >= MAX_CHANGE_ROUNDS) {
+          console.log(`[lifecycle:${taskId.slice(0, 8)}] Max change rounds (${MAX_CHANGE_ROUNDS}) exceeded.`);
+          await api.updateTaskStatus(taskId, 'errored', 'Max change request rounds exceeded');
+          return;
+        }
+
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Changes requested (round ${changeRound + 1}/${MAX_CHANGE_ROUNDS}), re-executing...`);
+        await api.updateTaskStatus(taskId, 'executing');
+
+        // Fetch the actual review feedback
+        let feedback = 'Please review and improve the code.';
+        try {
+          const retrieved = await api.getDiffFeedback(taskId);
+          if (retrieved) feedback = retrieved;
+        } catch (err) {
+          console.warn(`[lifecycle:${taskId.slice(0, 8)}] Failed to fetch review feedback:`, err);
+        }
+        await runChangesAgent(taskId, worktreePath, task, agentEntry, feedback, taskModel, effectiveRepoPath);
+
+        if (shuttingDown) return;
+
+        // Re-generate diff
+        const newDiffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
+        const newDiffStats = parseDiffStats(newDiffContent);
+        await api.submitDiff(taskId, {
+          diff_content: newDiffStats.diffContent,
+          files_changed: newDiffStats.filesChanged,
+          additions: newDiffStats.totalAdditions,
+          deletions: newDiffStats.totalDeletions,
+        });
+
+        await api.updateTaskStatus(taskId, 'awaiting_review');
+        currentReviewDecision = await waitForReviewDecision(taskId);
+        // Loop continues with new decision
       } else {
+        // Rejected
         await api.updateTaskStatus(taskId, 'rejected');
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Task rejected.`);
+        return;
       }
-    } else {
-      // Rejected
-      await api.updateTaskStatus(taskId, 'rejected');
-      console.log(`[lifecycle:${taskId.slice(0, 8)}] Task rejected.`);
     }
+
+    // If we exit the loop without returning, something went wrong
+    console.error(`[lifecycle:${taskId.slice(0, 8)}] Review loop ended without resolution.`);
+    await api.updateTaskStatus(taskId, 'errored', 'Review loop ended without resolution');
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[lifecycle:${taskId.slice(0, 8)}] Error: ${message}`);
@@ -568,6 +646,20 @@ async function runAgentLifecycle(
       // Best effort
     }
 
+    // Run workspace teardown
+    try {
+      const wsConfig = readWorkspaceConfig(effectiveRepoPath);
+      await runTeardown(worktreePath, slotNumber, wsConfig);
+    } catch (err) {
+      console.error(`[lifecycle:${taskId.slice(0, 8)}] Teardown failed:`, err);
+    }
+
+    try {
+      cleanupCheckpoints(worktreePath, taskId);
+    } catch {
+      // Best effort
+    }
+
     try {
       cleanupWorktree(worktreePath, effectiveRepoPath, branchName, effectiveDefaultBranch);
     } catch (err) {
@@ -583,10 +675,11 @@ async function runAgentLifecycle(
 function runPlanningAgent(
   taskId: string,
   worktreePath: string,
-  prompt: string
+  prompt: string,
+  model?: string
 ): Promise<ReturnType<typeof extractPlan>> {
   return new Promise((resolve, reject) => {
-    const { process: proc, kill } = spawnAgent(worktreePath, prompt, config.defaultModel);
+    const { process: proc, kill } = spawnAgent(worktreePath, prompt, model || config.defaultModel);
 
     const parser = new OutputParser(proc.stdout!);
     const monitor = new AgentMonitor(proc);
@@ -659,20 +752,23 @@ function runExecutionAgent(
   worktreePath: string,
   task: api.Task,
   agentEntry: ActiveAgent,
+  planFileManifest: string[],
+  model?: string,
   repoPath?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const executionPrompt = buildExecutionPrompt(task, repoPath);
+    const executionPrompt = buildExecutionPrompt(task, planFileManifest, repoPath);
     const { process: proc, kill } = spawnAgent(
       worktreePath,
       executionPrompt,
-      config.defaultModel
+      model || config.defaultModel
     );
 
     agentEntry.kill = kill;
 
     const parser = new OutputParser(proc.stdout!);
     const monitor = new AgentMonitor(proc);
+    let turnCount = 0;
     monitor.start();
 
     parser.on('message', () => {
@@ -681,7 +777,13 @@ function runExecutionAgent(
 
     parser.on('toolUse', (toolName: string) => {
       monitor.onOutput();
-      console.log(`[exec:${taskId.slice(0, 8)}] Tool use: ${toolName}`);
+      turnCount++;
+      console.log(`[exec:${taskId.slice(0, 8)}] Tool use: ${toolName} (turn ${turnCount})`);
+      // Checkpoint after each tool use
+      const saved = createCheckpoint(worktreePath, taskId, turnCount);
+      if (saved) {
+        console.log(`[exec:${taskId.slice(0, 8)}] Checkpoint ${turnCount} saved`);
+      }
     });
 
     parser.on('complete', () => {
@@ -719,14 +821,16 @@ function runChangesAgent(
   worktreePath: string,
   task: api.Task,
   agentEntry: ActiveAgent,
+  feedback: string,
+  model?: string,
   repoPath?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const changesPrompt = buildChangesPrompt(task, repoPath);
+    const changesPrompt = buildChangesPrompt(task, feedback, repoPath);
     const { process: proc, kill } = spawnAgent(
       worktreePath,
       changesPrompt,
-      config.defaultModel
+      model || config.defaultModel
     );
 
     agentEntry.kill = kill;
@@ -856,7 +960,7 @@ Generate a revised plan incorporating the feedback. Use this exact format:
 STOP after outputting the plan. Do not write any code yet. Wait for approval.`;
 }
 
-function buildExecutionPrompt(task: api.Task, repoPath?: string): string {
+function buildExecutionPrompt(task: api.Task, planFileManifest: string[], repoPath?: string): string {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
   const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
@@ -872,17 +976,28 @@ function buildExecutionPrompt(task: api.Task, repoPath?: string): string {
     ? `\n${claudeMdContent}\n`
     : '';
 
+  const fileListSection = planFileManifest.length > 0
+    ? `\nAPPROVED FILE MANIFEST (only modify these files unless absolutely necessary):\n${planFileManifest.map(f => `- ${f}`).join('\n')}\n`
+    : '';
+
   return `You are an AI coding agent working on a task. Your working directory is a git worktree.
 
 TASK: ${task.title}
 DESCRIPTION: ${task.description}
 ${claudeMdSection}
-PLAN APPROVED. Proceed with implementation. Write the code now.
+PLAN APPROVED. Proceed with implementation.
+${fileListSection}
+REQUIREMENTS:
+1. Implement all changes described in the approved plan.
+2. Write tests for your changes. If the project has an existing test framework, use it. If not, create appropriate test files.
+3. Run the tests to verify they pass before finishing.
+4. Only modify files listed in the approved file manifest unless you discover a genuine need to touch additional files.
+5. Commit your changes when done with a clear commit message describing what was changed and why.
 
-Make all the necessary changes to complete this task. Commit your changes when done.`;
+Do not skip writing tests. The reviewer will check for test coverage.`;
 }
 
-function buildChangesPrompt(task: api.Task, repoPath?: string): string {
+function buildChangesPrompt(task: api.Task, feedback: string, repoPath?: string): string {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
   const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
@@ -903,10 +1018,158 @@ function buildChangesPrompt(task: api.Task, repoPath?: string): string {
 TASK: ${task.title}
 DESCRIPTION: ${task.description}
 ${claudeMdSection}
-CHANGES REQUESTED. The following feedback was provided on your code:
-Please review the existing changes and make the requested improvements.
+CHANGES REQUESTED. The reviewer has provided the following feedback on your code:
 
-Please make the requested changes. Commit your changes when done.`;
+${feedback}
+
+REQUIREMENTS:
+1. Make the requested changes. Focus specifically on what the reviewer asked for.
+2. Update or add tests to cover the changes.
+3. Run tests to verify they pass.
+4. Commit your changes when done.`;
+}
+
+// ---- Code Audit ----
+
+interface AuditResult {
+  summary: string;
+  audit: {
+    bugs: string[];
+    security: string[];
+    testing: string[];
+    quality: string[];
+    verdict: 'pass' | 'concerns' | 'fail';
+  };
+}
+
+async function runCodeAudit(
+  taskId: string,
+  worktreePath: string,
+  diffContent: string,
+  planFileManifest: string[]
+): Promise<AuditResult | null> {
+  try {
+    const maxDiffLength = 15000;
+    const truncatedDiff = diffContent.length > maxDiffLength
+      ? diffContent.slice(0, maxDiffLength) + '\n... (truncated)'
+      : diffContent;
+
+    const fileList = planFileManifest.length > 0
+      ? `\nPlanned files: ${planFileManifest.join(', ')}`
+      : '';
+
+    const auditPrompt = `You are a senior code reviewer auditing a diff. Be thorough but concise.
+${fileList}
+
+\`\`\`diff
+${truncatedDiff}
+\`\`\`
+
+Respond in this EXACT format (no other text):
+
+## Summary
+[2-4 bullet points: what changed, one line per file]
+
+## Bugs
+[List potential bugs, logic errors, off-by-one errors. Write "None found" if clean.]
+
+## Security
+[List security issues: injection, XSS, hardcoded secrets, unsafe operations. Write "None found" if clean.]
+
+## Testing
+[Are tests included? Are edge cases covered? What tests are missing?]
+
+## Quality
+[Code quality issues: naming, duplication, complexity, missing error handling.]
+
+## Verdict
+[One word: PASS, CONCERNS, or FAIL]`;
+
+    return new Promise((resolve) => {
+      // Use Sonnet for the audit — strong enough to catch real issues, fast enough to not block
+      const { process: proc, kill } = spawnAgent(worktreePath, auditPrompt, 'claude-sonnet-4-20250514');
+      const parser = new OutputParser(proc.stdout!);
+
+      const timeout = setTimeout(() => {
+        kill();
+        resolve(null);
+      }, 60_000); // 60s timeout for audit
+
+      const finish = () => {
+        clearTimeout(timeout);
+        const text = parser.getCollectedText();
+        if (!text) {
+          resolve(null);
+          return;
+        }
+
+        // Parse the structured audit response
+        const result = parseAuditResponse(text);
+        resolve(result);
+      };
+
+      parser.on('complete', finish);
+      proc.on('exit', finish);
+    });
+  } catch (err) {
+    console.warn(`[lifecycle:${taskId.slice(0, 8)}] Code audit failed:`, err);
+    return null;
+  }
+}
+
+function parseAuditResponse(text: string): AuditResult {
+  const extractSection = (name: string): string => {
+    const regex = new RegExp(`## ${name}\\s*\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : '';
+  };
+
+  const parseBullets = (section: string): string[] => {
+    if (!section || section.toLowerCase().includes('none found')) return [];
+    return section
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.startsWith('-') || l.startsWith('*'))
+      .map(l => l.replace(/^[-*]\s*/, ''));
+  };
+
+  const summary = extractSection('Summary') || text.slice(0, 500);
+  const bugs = parseBullets(extractSection('Bugs'));
+  const security = parseBullets(extractSection('Security'));
+  const testing = parseBullets(extractSection('Testing'));
+  const quality = parseBullets(extractSection('Quality'));
+
+  const verdictSection = extractSection('Verdict').toUpperCase();
+  let verdict: 'pass' | 'concerns' | 'fail' = 'concerns';
+  if (verdictSection.includes('PASS')) verdict = 'pass';
+  else if (verdictSection.includes('FAIL')) verdict = 'fail';
+
+  return {
+    summary,
+    audit: { bugs, security, testing, quality, verdict },
+  };
+}
+
+// ---- Plan Compliance Check ----
+
+function checkPlanCompliance(
+  planFileManifest: string[],
+  actualFilesChanged: { path: string }[]
+): Record<string, unknown> {
+  const normalizePath = (p: string) => p.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+  const planned = new Set(planFileManifest.map(normalizePath));
+  const actual = new Set(actualFilesChanged.map(f => normalizePath(f.path)));
+
+  const unexpected = [...actual].filter(f => !planned.has(f));
+  const missing = [...planned].filter(f => !actual.has(f));
+
+  return {
+    planned: [...planned],
+    actual: [...actual],
+    unexpected,
+    missing,
+    compliant: unexpected.length === 0 && missing.length === 0,
+  };
 }
 
 // ---- Polling Helpers ----
@@ -923,6 +1186,12 @@ async function waitForPlanDecision(taskId: string): Promise<PlanDecision> {
 
   while (!shuttingDown && Date.now() - startTime < maxWait) {
     try {
+      // Check for cancellation
+      const task = await api.getTask(taskId);
+      if (task.status === 'cancelled') {
+        throw new Error('Task cancelled');
+      }
+
       const plans = await api.getPlans(taskId);
       if (plans.length > 0) {
         const latest = plans[plans.length - 1];
@@ -937,6 +1206,7 @@ async function waitForPlanDecision(taskId: string): Promise<PlanDecision> {
         }
       }
     } catch (err) {
+      if (err instanceof Error && err.message === 'Task cancelled') throw err;
       console.warn(`[waitForPlan:${taskId.slice(0, 8)}] Poll error:`, err);
     }
 
@@ -964,6 +1234,9 @@ async function waitForReviewDecision(
       }
       if (task.status === 'rejected') {
         return 'rejected';
+      }
+      if (task.status === 'cancelled') {
+        return 'rejected'; // Treat cancellation as rejection for flow purposes
       }
     } catch (err) {
       console.warn(`[waitForReview:${taskId.slice(0, 8)}] Poll error:`, err);

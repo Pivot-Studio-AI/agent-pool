@@ -79,7 +79,7 @@ class WebSocketManager {
       this.ws.send(
         JSON.stringify({
           type: 'subscribe',
-          channels: ['tasks', 'events', 'slots'],
+          channels: ['tasks', 'events', 'slots', 'plans', 'diffs'],
         })
       );
     }

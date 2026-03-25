@@ -2,13 +2,13 @@ import { EventEmitter } from 'events';
 import type { ChildProcess } from 'child_process';
 
 const HEALTH_CHECK_INTERVAL_MS = 10_000;
-const STALL_TIMEOUT_MS = 120_000;
+const STALL_TIMEOUT_MS = parseInt(process.env.AGENT_STALL_TIMEOUT_MS || '300000', 10); // 5 minutes default
 
 /**
  * Monitors a spawned agent process for health, stalls, and crashes.
  *
  * Events emitted:
- * - 'stall': no output received for >120 seconds
+ * - 'stall': no output received for >AGENT_STALL_TIMEOUT_MS (default 300s / 5 min)
  * - 'crash': process exited with non-zero code
  * - 'done': process exited with code 0
  */

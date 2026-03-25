@@ -4,7 +4,7 @@ import type { Duplex } from 'stream';
 import type { Server as HttpServer } from 'http';
 import { setBroadcastFn, type BroadcastMessage } from './broadcast.js';
 
-export const VALID_CHANNELS = ['tasks', 'events', 'slots'] as const;
+export const VALID_CHANNELS = ['tasks', 'events', 'slots', 'plans', 'diffs'] as const;
 export type Channel = (typeof VALID_CHANNELS)[number];
 
 /** All connected clients. */

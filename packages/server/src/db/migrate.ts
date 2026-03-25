@@ -50,16 +50,34 @@ export async function runMigrations(): Promise<void> {
     const filePath = resolve(MIGRATIONS_DIR, file);
     const sql = await readFile(filePath, 'utf-8');
 
+    // ALTER TYPE ... ADD VALUE cannot run inside a transaction block in PostgreSQL.
+    // Detect these statements and run them separately before the transactional part.
+    // NOTE: Each ALTER TYPE ADD VALUE MUST be on a single line for this parser to work.
+    const enumStatements: string[] = [];
+    const transactionalSql = sql.split('\n').filter((line) => {
+      if (/ALTER\s+TYPE\s+\S+\s+ADD\s+VALUE/i.test(line.trim())) {
+        enumStatements.push(line.trim());
+        return false;
+      }
+      return true;
+    }).join('\n');
+
     const client = await getClient();
     try {
+      // Run enum additions outside transaction
+      for (const stmt of enumStatements) {
+        await client.query(stmt);
+      }
+
+      // Run remaining SQL inside transaction
       await client.query('BEGIN');
-      await client.query(sql);
+      await client.query(transactionalSql);
       await client.query('INSERT INTO _migrations (name) VALUES ($1)', [file]);
       await client.query('COMMIT');
       console.log(`  [applied] ${file}`);
       ranCount++;
     } catch (err) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       console.error(`  [FAILED] ${file}:`, err);
       throw err;
     } finally {

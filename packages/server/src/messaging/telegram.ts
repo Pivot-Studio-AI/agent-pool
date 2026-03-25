@@ -138,10 +138,17 @@ export class TelegramBot {
     ].join('\n');
 
     const replyMarkup: InlineKeyboard = {
-      inline_keyboard: [[
-        { text: '\u2705 Approve', callback_data: `approve:${task.id}:${plan.id}` },
-        { text: '\u274C Reject', callback_data: `reject:${task.id}:${plan.id}` },
-      ]],
+      inline_keyboard: [
+        [
+          { text: '\u2705 Approve', callback_data: `approve:${task.id}:${plan.id}` },
+          { text: '\u274C Reject', callback_data: `reject:${task.id}:${plan.id}` },
+        ],
+        [
+          { text: 'Too complex', callback_data: `qreject:${task.id}:${plan.id}:complex` },
+          { text: 'Wrong approach', callback_data: `qreject:${task.id}:${plan.id}:approach` },
+          { text: 'Missing tests', callback_data: `qreject:${task.id}:${plan.id}:tests` },
+        ],
+      ],
     };
 
     const msgId = await this.sendMessage(text, 'Markdown', replyMarkup);
@@ -351,6 +358,26 @@ export class TelegramBot {
           break;
         }
 
+        case 'qreject': {
+          // Quick-reject with pre-filled feedback
+          if (!taskId || !planId) {
+            await this.answerCallbackQuery(query.id, 'Missing task or plan ID.');
+            return;
+          }
+          const reason = parts[3]; // complex, approach, tests
+          const feedbackMap: Record<string, string> = {
+            complex: 'This plan is too complex. Break it down into smaller, focused tasks.',
+            approach: 'Wrong approach. Reconsider the strategy and propose an alternative.',
+            tests: 'Missing tests. Include unit tests for the changes.',
+          };
+          const feedback = feedbackMap[reason] || 'Please revise the plan.';
+          await rejectPlan(planId, feedback);
+          await updateTaskStatus(taskId, 'planning');
+          await this.answerCallbackQuery(query.id, 'Plan rejected with feedback.');
+          await this.sendMessage(`\u274C Plan rejected: "${feedback.slice(0, 60)}..."\nAgent will revise.`);
+          break;
+        }
+
         case 'reject_merge': {
           if (!taskId) {
             await this.answerCallbackQuery(query.id, 'Missing task ID.');
@@ -472,6 +499,59 @@ export class TelegramBot {
             (t, i) => `${i + 1}. ${t.title} (${t.priority})`,
           );
           await this.sendMessage(`*Queued Tasks (${queuedTasks.length})*\n\n${lines.join('\n')}`);
+          break;
+        }
+
+        case 'BRIEF': {
+          const activeTasks = await listTasks({
+            statuses: ['planning', 'awaiting_approval', 'executing', 'awaiting_review', 'merging'],
+          });
+          const queuedTasks = await listTasks({ status: 'queued' });
+          const completedTasks = await listTasks({ statuses: ['completed'], limit: 50 });
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const completedToday = completedTasks.filter(
+            (t) => t.completed_at && new Date(t.completed_at) >= today
+          );
+          const needsAttention = activeTasks.filter(
+            (t) => t.status === 'awaiting_approval' || t.status === 'awaiting_review'
+          );
+          const executing = activeTasks.filter((t) => t.status === 'executing' || t.status === 'planning');
+
+          const lines: string[] = ['\u{1F4CA} *Agent Pool Brief*', ''];
+          if (needsAttention.length > 0) {
+            lines.push(`*Needs Attention (${needsAttention.length})*`);
+            for (const t of needsAttention) {
+              const label = t.status === 'awaiting_approval' ? 'plan ready' : 'diff ready';
+              lines.push(`\u2022 "${t.title}" \u2014 ${label}`);
+            }
+            lines.push('');
+          }
+          if (executing.length > 0) {
+            lines.push(`*In Progress (${executing.length})*`);
+            for (const t of executing) {
+              lines.push(`\u2022 "${t.title}" \u2014 ${t.status}`);
+            }
+            lines.push('');
+          }
+          lines.push(`Queued: ${queuedTasks.length}`);
+          lines.push(`Completed today: ${completedToday.length}`);
+          await this.sendMessage(lines.join('\n'));
+          break;
+        }
+
+        case 'CANCEL': {
+          if (!command.taskId) {
+            await this.sendMessage('Usage: CANCEL <task-id>');
+            return;
+          }
+          try {
+            await updateTaskStatus(command.taskId, 'cancelled', 'Cancelled via Telegram');
+            await this.sendMessage(`\u{1F6D1} Task cancelled.`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            await this.sendMessage(`Cannot cancel: ${msg}`);
+          }
           break;
         }
 

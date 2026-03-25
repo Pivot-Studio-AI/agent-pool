@@ -7,6 +7,8 @@ export const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 20,
   idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000, // Fail fast if DB is unreachable
+  allowExitOnIdle: true, // Allow process to exit even with idle connections
 });
 
 pool.on('error', (err) => {

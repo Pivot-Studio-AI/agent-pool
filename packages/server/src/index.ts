@@ -94,6 +94,46 @@ async function start() {
   }
 }
 
+// ── Graceful Shutdown ─────────────────────────────────────────────
+
+async function shutdown(signal: string) {
+  console.log(`\n[server] Received ${signal}. Shutting down gracefully...`);
+
+  // Stop accepting new connections
+  server.close(() => {
+    console.log('[server] HTTP server closed.');
+  });
+
+  // Stop Telegram polling
+  if (telegramBot.isConfigured()) {
+    telegramBot.stopPolling();
+  }
+
+  // Close all WebSocket connections
+  const { clients } = await import('./ws/server.js');
+  for (const ws of clients) {
+    ws.close(1001, 'Server shutting down');
+  }
+
+  // Drain the database pool
+  try {
+    const { pool } = await import('./db/connection.js');
+    await pool.end();
+    console.log('[server] Database pool closed.');
+  } catch {
+    // Best effort
+  }
+
+  // Give in-flight requests 5s to complete
+  setTimeout(() => {
+    console.log('[server] Shutdown complete.');
+    process.exit(0);
+  }, 5000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
 // Export sendNotification so other parts of the server can trigger messaging
 export { sendNotification };
 

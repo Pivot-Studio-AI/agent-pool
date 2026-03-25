@@ -1,6 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 
+// ─── Custom Error Classes ───────────────────────────────────────────
+
+export class NotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+// ─── Handler ────────────────────────────────────────────────────────
+
 function errorHandler(
   err: Error,
   _req: Request,
@@ -21,17 +39,31 @@ function errorHandler(
     return;
   }
 
+  // Typed errors
+  if (err instanceof NotFoundError) {
+    res.status(404).json({
+      error: { message: err.message, code: 'NOT_FOUND' },
+    });
+    return;
+  }
+
+  if (err instanceof ConflictError) {
+    res.status(409).json({
+      error: { message: err.message, code: 'CONFLICT' },
+    });
+    return;
+  }
+
   const message = err.message ?? 'Internal server error';
 
-  // Not found → 404
-  if (/not found/i.test(message)) {
+  // Legacy string-matching fallback (for errors not yet converted to typed classes)
+  if (/not found/i.test(message) && !message.toLowerCase().includes('connection')) {
     res.status(404).json({
       error: { message, code: 'NOT_FOUND' },
     });
     return;
   }
 
-  // Conflict cases → 409
   if (
     message.includes('Invalid transition') ||
     message.includes('No idle slots') ||

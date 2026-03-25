@@ -42,21 +42,48 @@ export class OutputParser extends EventEmitter {
 
   private setupLineReader(stdout: Readable): void {
     const rl = createInterface({ input: stdout, crlfDelay: Infinity });
+    let jsonBuffer = '';
 
     rl.on('line', (line: string) => {
       const trimmed = line.trim();
       if (!trimmed) return;
 
+      // First, try parsing the line as a standalone JSON object (common case)
       try {
         const parsed = JSON.parse(trimmed);
+        jsonBuffer = ''; // Reset buffer on successful parse
+        this.handleParsedLine(parsed);
+        return;
+      } catch {
+        // Not valid JSON on its own — might be part of a multi-line object
+      }
+
+      // Accumulate into buffer for multi-line JSON
+      jsonBuffer += (jsonBuffer ? '\n' : '') + trimmed;
+      try {
+        const parsed = JSON.parse(jsonBuffer);
+        jsonBuffer = ''; // Reset buffer on successful parse
         this.handleParsedLine(parsed);
       } catch {
-        // Not valid JSON — could be a raw log line, ignore
+        // Still incomplete — keep buffering.
+        // Safety: if buffer gets too large (>1MB), reset to prevent memory issues
+        if (jsonBuffer.length > 1_000_000) {
+          console.warn(`[output-parser] JSON buffer exceeded 1MB, discarding. First 500 chars: ${jsonBuffer.slice(0, 500)}`);
+          jsonBuffer = '';
+        }
       }
     });
 
     rl.on('close', () => {
-      // Stream ended — if no 'complete' was emitted, this will be caught by the monitor
+      // Try to parse any remaining buffer
+      if (jsonBuffer.trim()) {
+        try {
+          const parsed = JSON.parse(jsonBuffer);
+          this.handleParsedLine(parsed);
+        } catch {
+          // Final buffer wasn't valid JSON — discard
+        }
+      }
     });
 
     rl.on('error', (err: Error) => {

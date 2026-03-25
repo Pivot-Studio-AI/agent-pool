@@ -1,12 +1,14 @@
 import { query } from '../db/connection.js';
 import { broadcast } from '../ws/broadcast.js';
 import { createEvent } from './event-service.js';
+import { sendNotification } from '../messaging/notifications.js';
+import type { PlanRow } from './plan-service.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
 export type TaskStatus =
   | 'queued' | 'planning' | 'awaiting_approval' | 'executing'
-  | 'awaiting_review' | 'merging' | 'completed' | 'errored' | 'rejected';
+  | 'awaiting_review' | 'merging' | 'completed' | 'errored' | 'rejected' | 'cancelled';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -50,23 +52,24 @@ export interface UpdateTaskFields {
 // ─── State Machine ───────────────────────────────────────────────────
 
 const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  queued:             ['planning'],
-  planning:           ['awaiting_approval'],
-  awaiting_approval:  ['planning', 'executing', 'rejected'],
-  executing:          ['awaiting_review', 'errored'],
-  awaiting_review:    ['merging', 'executing', 'rejected'],
+  queued:             ['planning', 'cancelled'],
+  planning:           ['awaiting_approval', 'cancelled'],
+  awaiting_approval:  ['planning', 'executing', 'rejected', 'cancelled'],
+  executing:          ['awaiting_review', 'errored', 'cancelled'],
+  awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
   merging:            ['completed', 'errored'],
   // Terminal states — no outgoing transitions
   completed:          [],
   errored:            [],
   rejected:           [],
+  cancelled:          [],
 };
 
-const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected']);
+const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected', 'cancelled']);
 
 const ALL_STATUSES: Set<string> = new Set([
   'queued', 'planning', 'awaiting_approval', 'executing',
-  'awaiting_review', 'merging', 'completed', 'errored', 'rejected',
+  'awaiting_review', 'merging', 'completed', 'errored', 'rejected', 'cancelled',
 ]);
 
 /**
@@ -83,6 +86,7 @@ function eventTypeForTransition(from: TaskStatus, to: TaskStatus): string {
   if (to === 'completed') return 'task_completed';
   if (to === 'errored') return 'task_errored';
   if (to === 'rejected') return 'task_rejected';
+  if (to === 'cancelled') return 'task_cancelled';
   return 'task_assigned';
 }
 
@@ -225,7 +229,61 @@ export async function updateTaskStatus(
 
   broadcast('tasks', 'task.updated', updated);
 
+  // Dispatch messaging notifications for key transitions (fire-and-forget)
+  dispatchNotification(task.status, typedStatus, updated).catch((err) => {
+    console.error(`Notification dispatch failed for task ${id}:`, err);
+  });
+
   return updated;
+}
+
+/**
+ * Dispatch notifications for key task transitions.
+ * Async, fire-and-forget — never blocks the status update.
+ */
+async function dispatchNotification(
+  fromStatus: TaskStatus,
+  toStatus: TaskStatus,
+  task: TaskRow,
+): Promise<void> {
+  switch (toStatus) {
+    case 'awaiting_approval': {
+      // Plan is ready for review — fetch latest plan for notification
+      const planResult = await query<PlanRow>(
+        'SELECT * FROM plans WHERE task_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [task.id],
+      );
+      if (planResult.rows[0]) {
+        await sendNotification('plan_ready', task, { plan: planResult.rows[0] });
+      }
+      break;
+    }
+    case 'awaiting_review': {
+      // Diff is ready for review — fetch latest diff for notification
+      const diffResult = await query<{ additions: number; deletions: number; files_changed: unknown[] }>(
+        'SELECT additions, deletions, files_changed FROM diffs WHERE task_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [task.id],
+      );
+      if (diffResult.rows[0]) {
+        await sendNotification('review_ready', task, { diff: diffResult.rows[0] });
+      }
+      break;
+    }
+    case 'completed': {
+      const diffResult = await query<{ additions: number; deletions: number; files_changed: unknown[] }>(
+        'SELECT additions, deletions, files_changed FROM diffs WHERE task_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [task.id],
+      );
+      if (diffResult.rows[0]) {
+        await sendNotification('merge_completed', task, { diff: diffResult.rows[0] });
+      }
+      break;
+    }
+    case 'errored': {
+      await sendNotification('task_errored', task, { error: 'Task errored' });
+      break;
+    }
+  }
 }
 
 /**

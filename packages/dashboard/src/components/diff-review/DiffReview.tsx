@@ -132,6 +132,16 @@ export function DiffReview({ task }: DiffReviewProps) {
   const totalDeletions = diff.deletions;
   const filesChanged = diff.files_changed;
 
+  // Parse compliance data with type safety
+  const compliance = (() => {
+    const c = diff.compliance;
+    if (!c || typeof c !== 'object') return null;
+    const compliant = 'compliant' in c ? Boolean(c.compliant) : null;
+    const unexpected = Array.isArray((c as any).unexpected) ? (c as any).unexpected as string[] : [];
+    const missing = Array.isArray((c as any).missing) ? (c as any).missing as string[] : [];
+    return compliant !== null ? { compliant, unexpected, missing } : null;
+  })();
+
   return (
     <div className="p-6 space-y-6 overflow-auto">
       {/* Header */}
@@ -169,7 +179,97 @@ export function DiffReview({ task }: DiffReviewProps) {
         </span>
         <span className="text-green">+{totalAdditions}</span>
         <span className="text-red">-{totalDeletions}</span>
+        {compliance && !compliance.compliant && (
+          <span className="text-amber flex items-center gap-1">
+            Plan drift detected
+          </span>
+        )}
+        {compliance && compliance.compliant && (
+          <span className="text-green flex items-center gap-1">
+            Matches plan
+          </span>
+        )}
       </div>
+
+      {/* Agent Summary */}
+      {diff.summary && (
+        <Card>
+          <div className="px-4 py-3">
+            <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Agent Summary</div>
+            <div className="text-sm text-text-primary whitespace-pre-wrap">{diff.summary}</div>
+          </div>
+        </Card>
+      )}
+
+      {/* Compliance Warning */}
+      {compliance && !compliance.compliant && (
+        <div className="bg-amber/10 border border-amber/30 rounded px-4 py-3 text-sm">
+          <div className="font-medium text-amber mb-1">Plan Compliance Drift</div>
+          {compliance.unexpected.length > 0 && (
+            <div className="text-text-secondary">
+              Unexpected files: {compliance.unexpected.join(', ')}
+            </div>
+          )}
+          {compliance.missing.length > 0 && (
+            <div className="text-text-secondary">
+              Missing from plan: {compliance.missing.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Code Audit Report */}
+      {diff.audit && (
+        <Card>
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Code Audit</div>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                diff.audit.verdict === 'pass' ? 'bg-green/20 text-green' :
+                diff.audit.verdict === 'fail' ? 'bg-red/20 text-red' :
+                'bg-amber/20 text-amber'
+              }`}>
+                {diff.audit.verdict.toUpperCase()}
+              </span>
+            </div>
+            {diff.audit.bugs.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xs font-medium text-red mb-1">Bugs ({diff.audit.bugs.length})</div>
+                {diff.audit.bugs.map((b, i) => (
+                  <div key={i} className="text-sm text-text-secondary pl-3">- {b}</div>
+                ))}
+              </div>
+            )}
+            {diff.audit.security.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xs font-medium text-red mb-1">Security ({diff.audit.security.length})</div>
+                {diff.audit.security.map((s, i) => (
+                  <div key={i} className="text-sm text-text-secondary pl-3">- {s}</div>
+                ))}
+              </div>
+            )}
+            {diff.audit.testing.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xs font-medium text-amber mb-1">Testing</div>
+                {diff.audit.testing.map((t, i) => (
+                  <div key={i} className="text-sm text-text-secondary pl-3">- {t}</div>
+                ))}
+              </div>
+            )}
+            {diff.audit.quality.length > 0 && (
+              <div className="mb-2">
+                <div className="text-xs font-medium text-text-secondary mb-1">Quality</div>
+                {diff.audit.quality.map((q, i) => (
+                  <div key={i} className="text-sm text-text-muted pl-3">- {q}</div>
+                ))}
+              </div>
+            )}
+            {diff.audit.bugs.length === 0 && diff.audit.security.length === 0 && diff.audit.testing.length === 0 && diff.audit.quality.length === 0 && (
+              <div className="text-sm text-green">No issues found.</div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* File Tree + Diff */}
       <div className="grid grid-cols-[250px_1fr] gap-6">

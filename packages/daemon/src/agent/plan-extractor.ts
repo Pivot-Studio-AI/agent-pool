@@ -17,15 +17,15 @@ export interface ExtractedPlan {
  * Returns null if "## Plan" header is not found.
  */
 export function extractPlan(agentText: string): ExtractedPlan | null {
-  // Check if the plan header exists
-  if (!agentText.includes('## Plan')) {
+  // Check if the plan header exists (case-insensitive, flexible formatting)
+  if (!findHeader(agentText, 'plan')) {
     return null;
   }
 
-  const content = extractSection(agentText, '## Plan');
-  const filesSection = extractSection(agentText, '## Files to Modify');
-  const reasoning = extractSection(agentText, '## Reasoning');
-  const estimate = extractSection(agentText, '## Estimate');
+  const content = extractSection(agentText, 'plan');
+  const filesSection = extractSection(agentText, 'files to modify') || extractSection(agentText, 'files');
+  const reasoning = extractSection(agentText, 'reasoning');
+  const estimate = extractSection(agentText, 'estimate');
 
   // Parse file manifest from bullet list
   const fileManifest = parseFileManifest(filesSection);
@@ -39,25 +39,39 @@ export function extractPlan(agentText: string): ExtractedPlan | null {
 }
 
 /**
- * Extract the content under a specific ## header until the next ## header or end of text.
+ * Find a ## header in the text (case-insensitive, handles bold markers and flexible spacing).
+ * Returns the index of the header or -1 if not found.
  */
-function extractSection(text: string, header: string): string {
-  const headerIndex = text.indexOf(header);
+function findHeader(text: string, headerName: string): number {
+  // Match: ## Plan, ## **Plan**, ##Plan, ## PLAN, etc.
+  const regex = new RegExp(
+    `^#{2,3}\\s*\\**\\s*${headerName}\\s*\\**\\s*$`,
+    'im'
+  );
+  const match = text.match(regex);
+  return match ? (match.index ?? -1) : -1;
+}
+
+/**
+ * Extract the content under a ## header (case-insensitive) until the next ## header or end.
+ */
+function extractSection(text: string, headerName: string): string {
+  const headerIndex = findHeader(text, headerName);
   if (headerIndex === -1) {
     return '';
   }
 
-  // Start after the header line
-  const afterHeader = text.slice(headerIndex + header.length);
-  const lineBreakIndex = afterHeader.indexOf('\n');
+  // Find end of header line
+  const afterHeaderStart = text.slice(headerIndex);
+  const lineBreakIndex = afterHeaderStart.indexOf('\n');
   if (lineBreakIndex === -1) {
-    return afterHeader.trim();
+    return afterHeaderStart.trim();
   }
 
-  const contentStart = afterHeader.slice(lineBreakIndex + 1);
+  const contentStart = afterHeaderStart.slice(lineBreakIndex + 1);
 
   // Find the next ## header
-  const nextHeaderMatch = contentStart.match(/^## /m);
+  const nextHeaderMatch = contentStart.match(/^#{2,3}\s/m);
   if (nextHeaderMatch && nextHeaderMatch.index !== undefined) {
     return contentStart.slice(0, nextHeaderMatch.index);
   }
@@ -67,7 +81,7 @@ function extractSection(text: string, header: string): string {
 
 /**
  * Parse a bullet list of file paths from a markdown section.
- * Handles lines starting with - or *.
+ * Handles lines starting with - or *, backtick-wrapped paths, and descriptions after the path.
  */
 function parseFileManifest(section: string): string[] {
   if (!section.trim()) {
@@ -79,16 +93,24 @@ function parseFileManifest(section: string): string[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match lines starting with - or * followed by a path
+    // Match lines starting with - or * followed by content
     const match = trimmed.match(/^[-*]\s+(.+)$/);
     if (match) {
-      // Clean up: remove backticks, quotes, trailing descriptions
       let filePath = match[1].trim();
-      filePath = filePath.replace(/^[`"']|[`"']$/g, '');
-      // If there's a description after the path (e.g., "- path/to/file — description"), take only the path
-      const descSplit = filePath.split(/\s+[—\-\(]/);
-      filePath = descSplit[0].trim();
-      if (filePath) {
+
+      // If path is wrapped in backticks, extract just the backtick content
+      const backtickMatch = filePath.match(/^`([^`]+)`/);
+      if (backtickMatch) {
+        filePath = backtickMatch[1];
+      } else {
+        // Remove surrounding quotes
+        filePath = filePath.replace(/^[`"']|[`"']$/g, '');
+        // Split on em-dash or parenthetical ONLY (not regular hyphens which appear in filenames)
+        const descSplit = filePath.split(/\s+[—]\s+|\s+\(/);
+        filePath = descSplit[0].trim();
+      }
+
+      if (filePath && (filePath.includes('/') || filePath.includes('.'))) {
         files.push(filePath);
       }
     }

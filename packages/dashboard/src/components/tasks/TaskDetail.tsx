@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
-import { Loader, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { useMemo, useCallback, useState } from 'react';
+import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
 import { Badge } from '../shared/Badge';
+import { Button } from '../shared/Button';
 import { Card } from '../shared/Card';
 import { PlanReview } from '../plan-review/PlanReview';
 import { DiffReview } from '../diff-review/DiffReview';
 import { PRIORITY_COLORS } from '../../lib/constants';
+import { api } from '../../api/client';
 import type { Task } from '../../lib/types';
 
 function timeAgo(dateStr: string): string {
@@ -35,6 +37,39 @@ function elapsed(dateStr: string): string {
   return `${seconds}s`;
 }
 
+function CancelButton({ task }: { task: Task }) {
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const updateTaskInStore = useTaskStore((s) => s.updateTaskInStore);
+
+  const handleCancel = useCallback(async () => {
+    if (!confirm('Cancel this task? The agent will be stopped.')) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      const updated = await api.post<Task>(`/tasks/${task.id}/cancel`);
+      updateTaskInStore(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel task');
+    } finally {
+      setCancelling(false);
+    }
+  }, [task, updateTaskInStore]);
+
+  const cancellableStatuses = ['queued', 'planning', 'awaiting_approval', 'executing', 'awaiting_review'];
+  if (!cancellableStatuses.includes(task.status)) return null;
+
+  return (
+    <>
+      <Button variant="danger" size="sm" onClick={handleCancel} loading={cancelling} disabled={cancelling}>
+        <Ban size={14} className="mr-1" />
+        Cancel Task
+      </Button>
+      {error && <span className="text-red text-xs">{error}</span>}
+    </>
+  );
+}
+
 function TaskMetadata({ task }: { task: Task }) {
   return (
     <div className="flex items-center gap-4 text-sm text-text-secondary flex-wrap">
@@ -44,6 +79,7 @@ function TaskMetadata({ task }: { task: Task }) {
       <span>Model: {task.model_tier}</span>
       <span>Branch: {task.target_branch}</span>
       <span>Created {timeAgo(task.created_at)}</span>
+      <CancelButton task={task} />
     </div>
   );
 }
@@ -142,6 +178,8 @@ function CompletedView({ task }: { task: Task }) {
       <CheckCircle className="text-green" size={32} />
     ) : task.status === 'errored' ? (
       <XCircle className="text-red" size={32} />
+    ) : task.status === 'cancelled' ? (
+      <Ban className="text-text-muted" size={32} />
     ) : (
       <AlertTriangle className="text-red" size={32} />
     );
@@ -151,9 +189,14 @@ function CompletedView({ task }: { task: Task }) {
       ? 'Task Completed'
       : task.status === 'errored'
         ? 'Task Errored'
-        : 'Task Rejected';
+        : task.status === 'cancelled'
+          ? 'Task Cancelled'
+          : 'Task Rejected';
 
-  const labelColor = task.status === 'completed' ? 'text-green' : 'text-red';
+  const labelColor =
+    task.status === 'completed' ? 'text-green'
+    : task.status === 'cancelled' ? 'text-text-muted'
+    : 'text-red';
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
@@ -204,6 +247,7 @@ export function TaskDetail() {
     case 'completed':
     case 'errored':
     case 'rejected':
+    case 'cancelled':
       return <CompletedView task={task} />;
     default:
       return (

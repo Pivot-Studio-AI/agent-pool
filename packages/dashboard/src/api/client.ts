@@ -4,15 +4,20 @@ function getAuthToken(): string {
   // Prefer JWT from GitHub OAuth
   const token = localStorage.getItem('agent-pool-token');
   if (token) return token;
-  // Fall back to API key for backward compat
-  return localStorage.getItem('agent-pool-api-key') || 'dev-key';
+  // Fall back to API key (configured by user, not hardcoded)
+  const apiKey = localStorage.getItem('agent-pool-api-key');
+  if (apiKey) return apiKey;
+  // No auth available — requests will be rejected with 401
+  return '';
 }
 
 function headers(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${getAuthToken()}`,
-  };
+  const h: HeadersInit = { 'Content-Type': 'application/json' };
+  const token = getAuthToken();
+  if (token) {
+    h.Authorization = `Bearer ${token}`;
+  }
+  return h;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

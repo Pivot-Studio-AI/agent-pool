@@ -55,6 +55,9 @@ export interface DiffSubmission {
   files_changed: { path: string; additions: number; deletions: number }[];
   additions: number;
   deletions: number;
+  summary?: string;
+  compliance?: Record<string, unknown>;
+  audit?: Record<string, unknown>;
 }
 
 export interface FileLock {
@@ -264,6 +267,21 @@ export async function checkFileConflicts(
   files: string[]
 ): Promise<FileLock[]> {
   return request('GET', `/file-locks/check?files=${files.join(',')}`);
+}
+
+/**
+ * Get the review feedback from the latest diff for a task.
+ */
+export async function getDiffFeedback(taskId: string): Promise<string | null> {
+  const result = await request<{ feedback: string | null }>('GET', `/tasks/${taskId}/diffs/feedback`);
+  return result.feedback;
+}
+
+/**
+ * Cancel a task.
+ */
+export async function cancelTask(taskId: string): Promise<Task> {
+  return request('POST', `/tasks/${taskId}/cancel`);
 }
 
 /**

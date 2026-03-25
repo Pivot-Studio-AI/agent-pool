@@ -43,9 +43,22 @@ export function mergeBranch(
       // merge --abort may fail if there's no merge in progress, ignore
     }
 
+    // Check for unmerged files (more reliable than string matching)
+    let hasConflicts = false;
+    try {
+      const status = execFileSync('git', ['-C', worktreePath, 'diff', '--name-only', '--diff-filter=U'], {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      hasConflicts = status.length > 0;
+    } catch {
+      // If diff command fails, fall back to string matching
+      hasConflicts = message.includes('CONFLICT') || message.includes('conflict');
+    }
+
     return {
       success: false,
-      error: message.includes('CONFLICT')
+      error: hasConflicts
         ? `Merge conflict detected: ${message}`
         : `Merge failed: ${message}`,
     };

@@ -88,7 +88,8 @@ export function getRecentTasks(state: TaskState): Task[] {
       (t) =>
         t.status === 'completed' ||
         t.status === 'rejected' ||
-        t.status === 'errored'
+        t.status === 'errored' ||
+        t.status === 'cancelled'
     )
     .sort(
       (a, b) =>

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { submitDiff, getDiffs } from '../services/diff-service.js';
+import { submitDiff, getDiffs, getLatestDiffFeedback } from '../services/diff-service.js';
 
 export const diffRouter = Router();
 
@@ -19,6 +19,9 @@ const submitDiffSchema = z.object({
   ),
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
+  summary: z.string().optional(),
+  compliance: z.record(z.unknown()).optional(),
+  audit: z.record(z.unknown()).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -41,6 +44,18 @@ diffRouter.get('/:id/diffs', async (req, res, next) => {
   try {
     const diffs = await getDiffs(req.params.id);
     res.json({ data: diffs });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /tasks/:id/diffs/feedback — Get review feedback from latest diff
+// ---------------------------------------------------------------------------
+diffRouter.get('/:id/diffs/feedback', async (req, res, next) => {
+  try {
+    const feedback = await getLatestDiffFeedback(req.params.id);
+    res.json({ data: { feedback } });
   } catch (err) {
     next(err);
   }

@@ -16,6 +16,7 @@ const statusConfig: Record<TaskStatus, { color: string; label: string }> = {
   completed: { color: 'green', label: 'Completed' },
   errored: { color: 'red', label: 'Errored' },
   rejected: { color: 'red', label: 'Rejected' },
+  cancelled: { color: 'text-muted', label: 'Cancelled' },
 };
 
 export function TaskStatusBadge({ status, className }: TaskStatusBadgeProps) {

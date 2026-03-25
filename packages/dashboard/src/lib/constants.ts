@@ -12,6 +12,7 @@ export const STATUS_COLORS: Record<string, string> = {
   completed: 'text-green',
   errored: 'text-red',
   rejected: 'text-red',
+  cancelled: 'text-text-muted',
 };
 
 export const STATUS_BG_COLORS: Record<string, string> = {
@@ -24,6 +25,7 @@ export const STATUS_BG_COLORS: Record<string, string> = {
   completed: 'bg-green/20',
   errored: 'bg-red/20',
   rejected: 'bg-red/20',
+  cancelled: 'bg-text-muted/20',
 };
 
 export const PRIORITY_COLORS: Record<string, string> = {
