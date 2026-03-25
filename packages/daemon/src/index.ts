@@ -707,7 +707,11 @@ function runPlanningAgent(
     const finish = () => {
       monitor.stop();
       const text = parser.getCollectedText();
+      console.log(`[planning:${taskId.slice(0, 8)}] Collected text (${text.length} chars): ${text.slice(0, 500)}`);
       const plan = extractPlan(text);
+      if (!plan) {
+        console.warn(`[planning:${taskId.slice(0, 8)}] Plan extraction failed. Full text:\n${text.slice(0, 2000)}`);
+      }
       resolve(plan);
     };
 

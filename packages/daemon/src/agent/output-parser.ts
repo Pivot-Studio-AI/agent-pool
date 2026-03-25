@@ -97,8 +97,10 @@ export class OutputParser extends EventEmitter {
 
     switch (type) {
       case 'assistant': {
-        // Extract text content from the message
-        const content = this.extractTextContent(parsed);
+        // Claude Code stream-json wraps content in a `message` object:
+        // {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
+        const msg = (parsed.message as Record<string, unknown>) || parsed;
+        const content = this.extractTextContent(msg);
         if (content) {
           this.collectedText.push(content);
           this.emit('message', content);
@@ -112,11 +114,11 @@ export class OutputParser extends EventEmitter {
         break;
       }
       case 'result': {
-        const resultText = this.extractTextContent(parsed);
-        if (resultText) {
-          this.collectedText.push(resultText);
+        // Result has a top-level `result` string field with the final text
+        if (typeof parsed.result === 'string' && parsed.result) {
+          this.collectedText.push(parsed.result);
         }
-        this.emit('complete', parsed.result ?? parsed);
+        this.emit('complete', parsed);
         break;
       }
       case 'error': {
