@@ -483,7 +483,12 @@ async function runAgentLifecycle(
     }
 
     // 6. Execute implementation
-    await api.updateTaskStatus(taskId, 'executing');
+    // The dashboard may have already transitioned to 'executing' when approving the plan.
+    // Only transition if not already there.
+    const preExecTask = await api.getTask(taskId);
+    if (preExecTask.status !== 'executing') {
+      await api.updateTaskStatus(taskId, 'executing');
+    }
     await runExecutionAgent(taskId, worktreePath, task, agentEntry, planFileManifest, taskModel, effectiveRepoPath);
 
     if (shuttingDown) return;
@@ -584,7 +589,11 @@ async function runAgentLifecycle(
         }
 
         console.log(`[lifecycle:${taskId.slice(0, 8)}] Changes requested (round ${changeRound + 1}/${MAX_CHANGE_ROUNDS}), re-executing...`);
-        await api.updateTaskStatus(taskId, 'executing');
+        // Server may have already transitioned to 'executing' via the request-changes endpoint
+        const preChangeTask = await api.getTask(taskId);
+        if (preChangeTask.status !== 'executing') {
+          await api.updateTaskStatus(taskId, 'executing');
+        }
 
         // Fetch the actual review feedback
         let feedback = 'Please review and improve the code.';
