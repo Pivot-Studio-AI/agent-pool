@@ -18,6 +18,7 @@ import { checkoutBranch, createBranch, pullLatest } from './git/branch.js';
 import { generateDiff, parseDiffStats } from './git/diff.js';
 import { mergeBranch, pushBranch } from './git/merge.js';
 import { cleanupWorktree } from './worktree/cleanup.js';
+import { ensureRepo } from './git/clone.js';
 
 // ---- Types ----
 
@@ -38,17 +39,31 @@ const activeAgents = new Map<string, ActiveAgent>();
 
 async function main(): Promise<void> {
   console.log('[daemon] Starting Agent Pool daemon...');
-  console.log(`[daemon] Repo: ${config.repoPath}`);
   console.log(`[daemon] Pool size: ${config.poolSize}`);
   console.log(`[daemon] Server: ${config.serverUrl}`);
 
-  // 1. Validate repo path exists and has .git
-  if (!fs.existsSync(config.repoPath)) {
-    throw new Error(`Repo path does not exist: ${config.repoPath}`);
+  if (config.repoPath) {
+    console.log(`[daemon] Mode: fixed (REPO_PATH=${config.repoPath})`);
+    await runFixedMode();
+  } else {
+    console.log(`[daemon] Mode: dynamic (REPOS_BASE_DIR=${config.reposBaseDir})`);
+    await runDynamicMode();
   }
-  const gitDir = path.join(config.repoPath, '.git');
+}
+
+// ---- Fixed Mode (original behavior when REPO_PATH is set) ----
+
+async function runFixedMode(): Promise<void> {
+  const repoPath = config.repoPath!;
+  console.log(`[daemon] Repo: ${repoPath}`);
+
+  // 1. Validate repo path exists and has .git
+  if (!fs.existsSync(repoPath)) {
+    throw new Error(`Repo path does not exist: ${repoPath}`);
+  }
+  const gitDir = path.join(repoPath, '.git');
   if (!fs.existsSync(gitDir)) {
-    throw new Error(`Not a git repository (no .git): ${config.repoPath}`);
+    throw new Error(`Not a git repository (no .git): ${repoPath}`);
   }
   console.log('[daemon] Git repository validated.');
 
@@ -59,14 +74,14 @@ async function main(): Promise<void> {
 
   const { daemon, slots } = await api.registerDaemon(
     daemonName,
-    config.repoPath,
+    repoPath,
     config.poolSize
   );
   const daemonId = daemon.id;
   console.log(`[daemon] Registered with ID: ${daemonId}, ${slots.length} slots created.`);
 
   // 3. Provision worktree pool
-  const pool = new WorktreePool(config.repoPath, config.poolSize, config.defaultBranch);
+  const pool = new WorktreePool(repoPath, config.poolSize, config.defaultBranch);
   await pool.provision();
 
   // 4. Start heartbeat (every 30s)
@@ -99,7 +114,7 @@ async function main(): Promise<void> {
       );
 
       // Run the agent lifecycle without blocking the polling loop
-      runAgentLifecycle(task, slot, daemonId, pool).catch((err) => {
+      runAgentLifecycle(task, slot, daemonId, pool, repoPath).catch((err) => {
         console.error(`[daemon] Unhandled error in agent lifecycle for task ${task.id}:`, err);
       });
     } catch (err) {
@@ -150,14 +165,170 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
+// ---- Dynamic Mode (when REPO_PATH is not set, polls server for repo) ----
+
+async function runDynamicMode(): Promise<void> {
+  console.log('[daemon] Running in dynamic mode. Waiting for repo selection...');
+
+  // Register daemon (without a fixed repo)
+  const hostname = (await import('os')).default.hostname();
+  const daemonName = `daemon-${hostname}-${process.pid}`;
+  console.log(`[daemon] Registering as "${daemonName}"...`);
+
+  const { daemon } = await api.registerDaemon(
+    daemonName,
+    config.reposBaseDir,
+    config.poolSize
+  );
+  const daemonId = daemon.id;
+  console.log(`[daemon] Registered with ID: ${daemonId}`);
+
+  // Start heartbeat
+  const stopHeartbeat = startHeartbeat(daemonId, 30_000);
+  console.log('[daemon] Heartbeat started (30s interval).');
+
+  let currentRepoId: string | null = null;
+  let currentRepoPath: string | null = null;
+  let currentDefaultBranch: string = config.defaultBranch;
+  let pool: WorktreePool | null = null;
+  let stopTaskPolling: (() => void) | null = null;
+
+  // Poll for repo selection every 5 seconds
+  const repoCheckInterval = setInterval(async () => {
+    if (shuttingDown) return;
+
+    try {
+      const repo = await api.getCurrentRepo();
+      if (!repo) return;
+
+      if (repo.repo_id === currentRepoId) return; // No change
+
+      console.log(`[daemon] Repo selected: ${repo.github_full_name}`);
+
+      // If we were working on another repo, stop task polling
+      if (stopTaskPolling) {
+        stopTaskPolling();
+        stopTaskPolling = null;
+      }
+
+      if (pool && currentRepoPath) {
+        console.log('[daemon] Switching repos. Cleaning up previous pool...');
+        // Note: active agents on the old repo will finish naturally via activeAgents map
+      }
+
+      // Ensure repo exists locally (clone if needed)
+      const repoPath = ensureRepo(
+        repo.github_full_name,
+        repo.github_url,
+        config.reposBaseDir
+      );
+
+      currentRepoId = repo.repo_id;
+      currentRepoPath = repoPath;
+      currentDefaultBranch = repo.default_branch || config.defaultBranch;
+
+      // Acknowledge repo setup to server
+      await api.ackRepo(daemonId, repo.repo_id, repoPath);
+      console.log(`[daemon] Repo acknowledged: ${repoPath}`);
+
+      // Provision worktrees for this repo
+      pool = new WorktreePool(repoPath, config.poolSize, currentDefaultBranch);
+      await pool.provision();
+
+      // Start task polling for this repo
+      stopTaskPolling = startPolling(config.pollIntervalMs, async () => {
+        if (shuttingDown) return;
+
+        try {
+          const tasks = await api.getQueuedTasks();
+          if (!tasks.length) return;
+
+          const idleSlots = await api.getIdleSlots();
+          if (!idleSlots.length) return;
+
+          const task = tasks[0];
+          const slot = idleSlots[0];
+
+          try {
+            await api.claimSlot(slot.id, task.id, daemonId);
+          } catch {
+            // Another daemon claimed it first — skip
+            return;
+          }
+
+          console.log(
+            `[daemon] Task "${task.title}" (${task.id}) claimed slot ${slot.slot_number}`
+          );
+
+          // Run agent lifecycle with the current repo path
+          runAgentLifecycle(task, slot, daemonId, pool!, currentRepoPath!, currentDefaultBranch).catch((err) => {
+            console.error(`[daemon] Unhandled error in agent lifecycle for task ${task.id}:`, err);
+          });
+        } catch (err) {
+          console.error('[daemon] Polling error:', err);
+        }
+      });
+
+      console.log(`[daemon] Now working on ${repo.github_full_name} at ${repoPath}`);
+    } catch (err) {
+      console.error('[daemon] Repo check error:', err);
+    }
+  }, 5000);
+
+  // Graceful shutdown
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`\n[daemon] Received ${signal}. Shutting down gracefully...`);
+
+    clearInterval(repoCheckInterval);
+    if (stopTaskPolling) stopTaskPolling();
+    stopHeartbeat();
+
+    // Wait for active agents with a timeout
+    if (activeAgents.size > 0) {
+      console.log(`[daemon] Waiting for ${activeAgents.size} active agent(s) to finish...`);
+      const timeout = 30_000;
+      const start = Date.now();
+
+      while (activeAgents.size > 0 && Date.now() - start < timeout) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // Kill remaining agents
+      if (activeAgents.size > 0) {
+        console.log(`[daemon] Timeout reached. Killing ${activeAgents.size} remaining agent(s).`);
+        for (const agent of activeAgents.values()) {
+          agent.kill();
+          try {
+            await api.releaseSlot(agent.slotId);
+          } catch {
+            // Best effort
+          }
+        }
+      }
+    }
+
+    console.log('[daemon] Shutdown complete.');
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
 // ---- Agent Lifecycle ----
 
 async function runAgentLifecycle(
   task: api.Task,
   slot: api.Slot,
   daemonId: string,
-  pool: WorktreePool
+  pool: WorktreePool,
+  repoPath?: string,
+  defaultBranch?: string
 ): Promise<void> {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
+  const effectiveDefaultBranch = defaultBranch ?? config.defaultBranch;
   const taskId = task.id;
   const slotId = slot.id;
   const slotNumber = slot.slot_number;
@@ -177,19 +348,19 @@ async function runAgentLifecycle(
     // 1. Prepare worktree
     console.log(`[lifecycle:${taskId.slice(0, 8)}] Preparing worktree at ${worktreePath}`);
     try {
-      checkoutBranch(worktreePath, config.defaultBranch);
+      checkoutBranch(worktreePath, effectiveDefaultBranch);
     } catch {
       // May already be on the right branch or in detached HEAD state
       console.warn(`[lifecycle:${taskId.slice(0, 8)}] Checkout default branch warning, continuing...`);
     }
     pullLatest(worktreePath);
-    createBranch(worktreePath, branchName, config.defaultBranch);
+    createBranch(worktreePath, branchName, effectiveDefaultBranch);
 
     // 2. Update task status to planning
     await api.updateTaskStatus(taskId, 'planning');
 
     // 3. Build the plan prompt
-    const prompt = buildPlanPrompt(task);
+    const prompt = buildPlanPrompt(task, effectiveRepoPath);
 
     // 4. Run planning phase (may loop if plan is rejected)
     let approved = false;
@@ -230,7 +401,7 @@ async function runAgentLifecycle(
         await api.updateTaskStatus(taskId, 'planning');
         // The prompt will be rebuilt with rejection feedback on next loop iteration
         // Actually, we need to rebuild the prompt with rejection feedback
-        const rejectionPrompt = buildRejectionPrompt(task, decision.feedback);
+        const rejectionPrompt = buildRejectionPrompt(task, decision.feedback, effectiveRepoPath);
         // Override prompt for next iteration — we'll just recursively spawn
         const retryResult = await runPlanningAgent(taskId, worktreePath, rejectionPrompt);
         if (!retryResult) {
@@ -278,12 +449,12 @@ async function runAgentLifecycle(
 
     // 6. Execute implementation
     await api.updateTaskStatus(taskId, 'executing');
-    await runExecutionAgent(taskId, worktreePath, task, agentEntry);
+    await runExecutionAgent(taskId, worktreePath, task, agentEntry, effectiveRepoPath);
 
     if (shuttingDown) return;
 
     // 7. Generate and submit diff
-    const diffContent = generateDiff(worktreePath, config.defaultBranch, branchName);
+    const diffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
     const diffStats = parseDiffStats(diffContent);
 
     await api.submitDiff(taskId, {
@@ -305,7 +476,7 @@ async function runAgentLifecycle(
     if (reviewDecision === 'approved') {
       // 9. Merge
       await api.updateTaskStatus(taskId, 'merging');
-      const mergeResult = mergeBranch(worktreePath, config.defaultBranch, branchName);
+      const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
 
       if (!mergeResult.success) {
         console.error(
@@ -316,7 +487,7 @@ async function runAgentLifecycle(
       }
 
       // Push
-      const pushResult = pushBranch(worktreePath, config.defaultBranch);
+      const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
       if (!pushResult.success) {
         console.error(
           `[lifecycle:${taskId.slice(0, 8)}] Push failed: ${pushResult.error}`
@@ -335,10 +506,10 @@ async function runAgentLifecycle(
 
       // Fetch the latest review comments
       const latestTask = await api.getTask(taskId);
-      await runChangesAgent(taskId, worktreePath, task, agentEntry);
+      await runChangesAgent(taskId, worktreePath, task, agentEntry, effectiveRepoPath);
 
       // Re-generate diff
-      const newDiffContent = generateDiff(worktreePath, config.defaultBranch, branchName);
+      const newDiffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
       const newDiffStats = parseDiffStats(newDiffContent);
       await api.submitDiff(taskId, {
         diff_content: newDiffStats.diffContent,
@@ -353,9 +524,9 @@ async function runAgentLifecycle(
 
       if (finalDecision === 'approved') {
         await api.updateTaskStatus(taskId, 'merging');
-        const mergeResult = mergeBranch(worktreePath, config.defaultBranch, branchName);
+        const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
         if (mergeResult.success) {
-          const pushResult = pushBranch(worktreePath, config.defaultBranch);
+          const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
           if (pushResult.success) {
             await api.updateTaskStatus(taskId, 'completed');
             console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed after changes!`);
@@ -398,7 +569,7 @@ async function runAgentLifecycle(
     }
 
     try {
-      cleanupWorktree(worktreePath, config.repoPath, branchName, config.defaultBranch);
+      cleanupWorktree(worktreePath, effectiveRepoPath, branchName, effectiveDefaultBranch);
     } catch (err) {
       console.error(`[lifecycle:${taskId.slice(0, 8)}] Cleanup error:`, err);
     }
@@ -487,10 +658,11 @@ function runExecutionAgent(
   taskId: string,
   worktreePath: string,
   task: api.Task,
-  agentEntry: ActiveAgent
+  agentEntry: ActiveAgent,
+  repoPath?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const executionPrompt = buildExecutionPrompt(task);
+    const executionPrompt = buildExecutionPrompt(task, repoPath);
     const { process: proc, kill } = spawnAgent(
       worktreePath,
       executionPrompt,
@@ -546,10 +718,11 @@ function runChangesAgent(
   taskId: string,
   worktreePath: string,
   task: api.Task,
-  agentEntry: ActiveAgent
+  agentEntry: ActiveAgent,
+  repoPath?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const changesPrompt = buildChangesPrompt(task);
+    const changesPrompt = buildChangesPrompt(task, repoPath);
     const { process: proc, kill } = spawnAgent(
       worktreePath,
       changesPrompt,
@@ -601,9 +774,10 @@ function runChangesAgent(
 
 // ---- Prompt Builders ----
 
-function buildPlanPrompt(task: api.Task): string {
+function buildPlanPrompt(task: api.Task, repoPath?: string): string {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
-  const claudeMdPath = path.join(config.repoPath, 'CLAUDE.md');
+  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
     try {
       claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
@@ -640,9 +814,10 @@ INSTRUCTIONS:
 2. STOP after outputting the plan. Do not write any code yet. Wait for approval.`;
 }
 
-function buildRejectionPrompt(task: api.Task, feedback: string): string {
+function buildRejectionPrompt(task: api.Task, feedback: string, repoPath?: string): string {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
-  const claudeMdPath = path.join(config.repoPath, 'CLAUDE.md');
+  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
     try {
       claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
@@ -681,9 +856,10 @@ Generate a revised plan incorporating the feedback. Use this exact format:
 STOP after outputting the plan. Do not write any code yet. Wait for approval.`;
 }
 
-function buildExecutionPrompt(task: api.Task): string {
+function buildExecutionPrompt(task: api.Task, repoPath?: string): string {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
-  const claudeMdPath = path.join(config.repoPath, 'CLAUDE.md');
+  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
     try {
       claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
@@ -706,9 +882,10 @@ PLAN APPROVED. Proceed with implementation. Write the code now.
 Make all the necessary changes to complete this task. Commit your changes when done.`;
 }
 
-function buildChangesPrompt(task: api.Task): string {
+function buildChangesPrompt(task: api.Task, repoPath?: string): string {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
   let claudeMdContent = '';
-  const claudeMdPath = path.join(config.repoPath, 'CLAUDE.md');
+  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
     try {
       claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');

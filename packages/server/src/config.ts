@@ -15,6 +15,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   API_KEY: z.string().min(1, 'API_KEY is required'),
   DASHBOARD_URL: z.string().default('http://localhost:5173'),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  ENCRYPTION_KEY: z.string().length(64).optional(),
+  JWT_SECRET: z.string().min(32).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -29,6 +33,10 @@ export const config = {
   port: parsed.data.PORT,
   apiKey: parsed.data.API_KEY,
   dashboardUrl: parsed.data.DASHBOARD_URL,
+  githubClientId: parsed.data.GITHUB_CLIENT_ID,
+  githubClientSecret: parsed.data.GITHUB_CLIENT_SECRET,
+  encryptionKey: parsed.data.ENCRYPTION_KEY,
+  jwtSecret: parsed.data.JWT_SECRET,
 } as const;
 
 export type Config = typeof config;

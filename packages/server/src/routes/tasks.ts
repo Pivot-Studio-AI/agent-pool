@@ -21,6 +21,7 @@ const createTaskSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   target_branch: z.string().optional(),
   model_tier: z.string().optional(),
+  repo_id: z.string().uuid().optional(),
 });
 
 const updateTaskSchema = z.object({
@@ -34,6 +35,7 @@ const updateTaskSchema = z.object({
 const listTasksQuerySchema = z.object({
   status: z.string().optional(),
   limit: z.coerce.number().int().positive().default(50),
+  repo_id: z.string().uuid().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -58,7 +60,7 @@ taskRouter.get('/', async (req, res, next) => {
     const statuses = query.status
       ? query.status.split(',').map((s) => s.trim()).filter(Boolean)
       : undefined;
-    const tasks = await listTasks({ statuses, limit: query.limit });
+    const tasks = await listTasks({ statuses, limit: query.limit, repo_id: query.repo_id });
     res.json({ data: tasks });
   } catch (err) {
     next(err);

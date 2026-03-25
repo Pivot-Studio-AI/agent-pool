@@ -65,6 +65,13 @@ export interface FileLock {
   locked_at: string;
 }
 
+export interface Repo {
+  repo_id: string;
+  github_full_name: string;
+  github_url: string;
+  default_branch: string;
+}
+
 // ---- Retry helper ----
 
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
@@ -257,4 +264,35 @@ export async function checkFileConflicts(
   files: string[]
 ): Promise<FileLock[]> {
   return request('GET', `/file-locks/check?files=${files.join(',')}`);
+}
+
+/**
+ * Get the currently selected repo for this daemon.
+ * Returns null if no repo is selected.
+ */
+export async function getCurrentRepo(): Promise<Repo | null> {
+  try {
+    return await request<Repo>('GET', '/daemon/repo');
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('404')) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Acknowledge that the daemon has set up the repo locally.
+ */
+export async function ackRepo(
+  daemonId: string,
+  repoId: string,
+  localPath: string
+): Promise<void> {
+  await request('POST', '/daemon/repo/ack', {
+    daemon_id: daemonId,
+    repo_id: repoId,
+    local_path: localPath,
+  });
 }

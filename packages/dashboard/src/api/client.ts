@@ -1,13 +1,17 @@
 import { API_BASE } from '../lib/constants';
 
-function getApiKey(): string {
+function getAuthToken(): string {
+  // Prefer JWT from GitHub OAuth
+  const token = localStorage.getItem('agent-pool-token');
+  if (token) return token;
+  // Fall back to API key for backward compat
   return localStorage.getItem('agent-pool-api-key') || 'dev-key';
 }
 
 function headers(): HeadersInit {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${getApiKey()}`,
+    Authorization: `Bearer ${getAuthToken()}`,
   };
 }
 
@@ -17,6 +21,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     headers: headers(),
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem('agent-pool-token');
+    window.location.reload();
+    throw new Error('Unauthorized');
+  }
 
   const json = await res.json();
 

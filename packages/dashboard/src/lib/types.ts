@@ -67,3 +67,27 @@ export interface WSMessage {
   data: any;
   timestamp: string;
 }
+
+export interface User {
+  id: string;
+  github_login: string;
+  github_avatar_url: string;
+}
+
+export interface Repository {
+  id: string;
+  github_full_name: string;
+  github_url: string;
+  default_branch: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface GithubRepo {
+  id: number;
+  full_name: string;
+  html_url: string;
+  default_branch: string;
+  private: boolean;
+  description: string | null;
+}

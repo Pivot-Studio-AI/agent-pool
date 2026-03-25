@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { useAuthStore } from './auth-store';
 import type { Task } from '../lib/types';
 
 interface TaskState {
@@ -26,7 +27,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   fetchTasks: async () => {
     set({ loading: true });
     try {
-      const tasks = await api.get<Task[]>('/tasks?limit=100');
+      const selectedRepo = useAuthStore.getState().selectedRepo;
+      let path = '/tasks?limit=100';
+      if (selectedRepo?.id) {
+        path += `&repo_id=${selectedRepo.id}`;
+      }
+      const tasks = await api.get<Task[]>(path);
       const record: Record<string, Task> = {};
       for (const task of tasks) {
         record[task.id] = task;
@@ -38,7 +44,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   createTask: async (data) => {
-    const task = await api.post<Task>('/tasks', data);
+    const selectedRepo = useAuthStore.getState().selectedRepo;
+    const body: Record<string, unknown> = { ...data };
+    if (selectedRepo?.id) {
+      body.repo_id = selectedRepo.id;
+    }
+    const task = await api.post<Task>('/tasks', body);
     set((state) => ({
       tasks: { ...state.tasks, [task.id]: task },
     }));

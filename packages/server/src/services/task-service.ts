@@ -30,6 +30,7 @@ export interface CreateTaskData {
   priority?: TaskPriority;
   target_branch?: string;
   model_tier?: string;
+  repo_id?: string;
 }
 
 export interface ListTasksFilters {
@@ -37,6 +38,7 @@ export interface ListTasksFilters {
   /** Alias for status — accepts an array of statuses (used by some routes) */
   statuses?: string[];
   limit?: number;
+  repo_id?: string;
 }
 
 export interface UpdateTaskFields {
@@ -91,8 +93,8 @@ function eventTypeForTransition(from: TaskStatus, to: TaskStatus): string {
  */
 export async function createTask(data: CreateTaskData): Promise<TaskRow> {
   const result = await query<TaskRow>(
-    `INSERT INTO tasks (title, description, priority, target_branch, model_tier)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO tasks (title, description, priority, target_branch, model_tier, repo_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
     [
       data.title,
@@ -100,6 +102,7 @@ export async function createTask(data: CreateTaskData): Promise<TaskRow> {
       data.priority ?? 'medium',
       data.target_branch ?? 'main',
       data.model_tier ?? 'default',
+      data.repo_id ?? null,
     ],
   );
 
@@ -149,6 +152,11 @@ export async function listTasks(filters: ListTasksFilters = {}): Promise<TaskRow
     const placeholders = statusList.map(() => `$${paramIdx++}`);
     conditions.push(`status IN (${placeholders.join(', ')})`);
     params.push(...statusList);
+  }
+
+  if (filters.repo_id) {
+    conditions.push(`repo_id = $${paramIdx++}`);
+    params.push(filters.repo_id);
   }
 
   const limit = filters.limit ?? 100;

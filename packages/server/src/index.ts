@@ -22,6 +22,8 @@ import { slotRouter } from './routes/slots.js';
 import { daemonRouter } from './routes/daemon.js';
 import { fileLockRouter } from './routes/file-locks.js';
 import { messagingRouter } from './routes/messaging.js';
+import { authRouter } from './routes/auth.js';
+import { repoRouter } from './routes/repos.js';
 import { telegramBot } from './messaging/telegram.js';
 import { sendNotification } from './messaging/notifications.js';
 
@@ -39,6 +41,9 @@ app.get('/health', (_req, res) => { res.json({ status: 'ok' }); });
 // Messaging webhooks — mounted BEFORE auth (Meta sends these directly)
 app.use('/api/v1/messaging', messagingRouter);
 
+// Auth routes — mounted BEFORE global auth middleware (OAuth flow is unauthenticated)
+app.use('/api/v1/auth', authRouter);
+
 // Auth middleware on all /api/v1 routes
 app.use('/api/v1', auth);
 
@@ -51,6 +56,7 @@ app.use('/api/v1/tasks', mergeRouter);
 app.use('/api/v1/events', eventRouter);
 app.use('/api/v1/slots', slotRouter);
 app.use('/api/v1/daemon', daemonRouter);
+app.use('/api/v1/repos', repoRouter);
 app.use('/api/v1/file-locks', fileLockRouter);
 
 // Serve dashboard static files in production
