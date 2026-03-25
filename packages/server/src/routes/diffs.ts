@@ -74,7 +74,7 @@ diffRouter.get('/:id/diffs/feedback', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 // PATCH /tasks/:id/diffs/tests — Update test results on latest diff
 // ---------------------------------------------------------------------------
-diffRouter.post('/:id/diffs/tests', async (req, res, next) => {
+diffRouter.post('/:id/test-results', async (req, res, next) => {
   try {
     const testResults = updateTestResultsSchema.parse(req.body);
     await updateTestResults(req.params.id, testResults);

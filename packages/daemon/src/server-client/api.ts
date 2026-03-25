@@ -288,7 +288,7 @@ export async function cancelTask(taskId: string): Promise<Task> {
  * Update test results on the latest diff for a task.
  */
 export async function updateDiffTestResults(taskId: string, testResults: Record<string, unknown>): Promise<void> {
-  await request('POST', `/tasks/${taskId}/diffs/tests`, testResults);
+  await request('POST', `/tasks/${taskId}/test-results`, testResults);
 }
 
 /**
