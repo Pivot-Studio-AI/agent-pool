@@ -48,8 +48,14 @@ export function useWebSocket() {
         }
 
         case 'diffs.tests_updated': {
-          // Test results updated — force task store to refresh so DiffReview re-fetches
+          // Test results updated — update the task in store to trigger DiffReview re-render
           if (data?.task_id) {
+            // Force the task's updated_at to change so components re-fetch diffs
+            const tasks = useTaskStore.getState().tasks;
+            const task = tasks[data.task_id];
+            if (task) {
+              updateTask({ ...task, updated_at: new Date().toISOString() });
+            }
             addToast('Test results updated', data.task_id);
           }
           break;

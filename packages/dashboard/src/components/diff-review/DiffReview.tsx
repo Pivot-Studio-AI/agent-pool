@@ -48,7 +48,7 @@ export function DiffReview({ task }: DiffReviewProps) {
     } finally {
       setLoading(false);
     }
-  }, [task.id]);
+  }, [task.id, task.updated_at]);
 
   useEffect(() => {
     fetchDiffs();

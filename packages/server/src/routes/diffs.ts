@@ -24,6 +24,16 @@ const submitDiffSchema = z.object({
   audit: z.record(z.unknown()).optional(),
 });
 
+const updateTestResultsSchema = z.object({
+  status: z.enum(['running', 'passed', 'failed', 'skipped']),
+  tests_written: z.number().int().nonnegative().optional(),
+  tests_passed: z.number().int().nonnegative().optional(),
+  tests_failed: z.number().int().nonnegative().optional(),
+  failures: z.array(z.string()).optional(),
+  duration_ms: z.number().nonnegative().optional(),
+  summary: z.string().optional(),
+}).passthrough();
+
 // ---------------------------------------------------------------------------
 // POST /tasks/:id/diffs — Submit a diff
 // ---------------------------------------------------------------------------
@@ -66,7 +76,7 @@ diffRouter.get('/:id/diffs/feedback', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 diffRouter.patch('/:id/diffs/tests', async (req, res, next) => {
   try {
-    const testResults = req.body;
+    const testResults = updateTestResultsSchema.parse(req.body);
     await updateTestResults(req.params.id, testResults);
     res.json({ data: { updated: true } });
   } catch (err) {
