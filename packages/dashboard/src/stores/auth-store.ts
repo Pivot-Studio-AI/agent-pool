@@ -84,7 +84,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   fetchGitHubRepos: async () => {
     try {
-      const repos = await api.get<GithubRepo[]>('/auth/github/repos');
+      const repos = await api.get<GithubRepo[]>('/repos/github');
       set({ githubRepos: repos });
     } catch {
       // Silently fail — user can retry

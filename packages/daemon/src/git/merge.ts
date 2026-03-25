@@ -11,22 +11,27 @@ export interface PushResult {
 }
 
 /**
- * Merge taskBranch into targetBranch with --no-ff (no fast-forward).
- * Detects merge conflicts from exit code/stderr.
+ * Merge taskBranch into targetBranch using a worktree-safe strategy.
+ *
+ * In a git worktree, you CANNOT checkout the target branch (e.g., main)
+ * because it's already checked out by the parent repo. Instead we:
+ * 1. Fetch the latest target from origin
+ * 2. Merge origin/target into the task branch (so the task branch includes target's changes)
+ * 3. Push the result to the remote target branch
  */
 export function mergeBranch(
   worktreePath: string,
   targetBranch: string,
-  taskBranch: string
+  _taskBranch: string
 ): MergeResult {
   try {
-    // First, checkout the target branch
-    execFileSync('git', ['-C', worktreePath, 'checkout', targetBranch], {
+    // Fetch latest target branch from remote
+    execFileSync('git', ['-C', worktreePath, 'fetch', 'origin', targetBranch], {
       stdio: 'pipe',
     });
 
-    // Then merge with --no-ff
-    execFileSync('git', ['-C', worktreePath, 'merge', '--no-ff', taskBranch], {
+    // Merge origin/target into current branch (task branch) with --no-ff
+    execFileSync('git', ['-C', worktreePath, 'merge', '--no-ff', `origin/${targetBranch}`, '-m', `Merge ${targetBranch} into task branch`], {
       stdio: 'pipe',
     });
 
@@ -43,7 +48,15 @@ export function mergeBranch(
       // merge --abort may fail if there's no merge in progress, ignore
     }
 
-    // Check for unmerged files (more reliable than string matching)
+    // Clean up worktree after failed merge
+    try {
+      execFileSync('git', ['-C', worktreePath, 'reset', '--hard', 'HEAD'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', worktreePath, 'clean', '-fd'], { stdio: 'pipe' });
+    } catch {
+      // Best effort cleanup
+    }
+
+    // Check for unmerged files
     let hasConflicts = false;
     try {
       const status = execFileSync('git', ['-C', worktreePath, 'diff', '--name-only', '--diff-filter=U'], {
@@ -52,7 +65,6 @@ export function mergeBranch(
       }).trim();
       hasConflicts = status.length > 0;
     } catch {
-      // If diff command fails, fall back to string matching
       hasConflicts = message.includes('CONFLICT') || message.includes('conflict');
     }
 
@@ -66,16 +78,25 @@ export function mergeBranch(
 }
 
 /**
- * Push a branch to origin.
+ * Push the current branch (task branch) to a remote target branch.
+ * Uses `HEAD:targetBranch` to push the worktree's current branch to the remote target.
  */
-export function pushBranch(worktreePath: string, branch: string): PushResult {
+export function pushBranch(worktreePath: string, targetBranch: string): PushResult {
   try {
-    execFileSync('git', ['-C', worktreePath, 'push', 'origin', branch], {
+    execFileSync('git', ['-C', worktreePath, 'push', 'origin', `HEAD:${targetBranch}`], {
       stdio: 'pipe',
     });
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+
+    // If push fails, undo the local merge commit to prevent slot contamination
+    try {
+      execFileSync('git', ['-C', worktreePath, 'reset', '--hard', 'HEAD~1'], { stdio: 'pipe' });
+    } catch {
+      // Best effort — if reset fails, cleanup will handle it
+    }
+
     return {
       success: false,
       error: `Push failed: ${message}`,

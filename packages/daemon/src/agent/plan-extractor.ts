@@ -110,7 +110,7 @@ function parseFileManifest(section: string): string[] {
         filePath = descSplit[0].trim();
       }
 
-      if (filePath && (filePath.includes('/') || filePath.includes('.'))) {
+      if (filePath) {
         files.push(filePath);
       }
     }

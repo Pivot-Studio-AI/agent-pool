@@ -379,7 +379,9 @@ async function runAgentLifecycle(
     if (wsConfig?.setup) {
       const setupOk = await runSetup(worktreePath, slotNumber, wsConfig);
       if (!setupOk) {
-        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Workspace setup failed, continuing anyway...`);
+        console.error(`[lifecycle:${taskId.slice(0, 8)}] Workspace setup failed, aborting task.`);
+        await api.updateTaskStatus(taskId, 'errored', 'Workspace setup script failed');
+        return;
       }
     }
 
