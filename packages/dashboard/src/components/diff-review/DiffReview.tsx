@@ -271,6 +271,50 @@ export function DiffReview({ task }: DiffReviewProps) {
         </Card>
       )}
 
+      {/* Test Results */}
+      {diff.test_results && (
+        <Card>
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Tests</div>
+              {diff.test_results.status === 'running' && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-accent/20 text-accent">
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                  Running...
+                </span>
+              )}
+              {diff.test_results.status === 'passed' && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-green/20 text-green">
+                  {diff.test_results.tests_passed}/{diff.test_results.tests_written} PASSED
+                </span>
+              )}
+              {diff.test_results.status === 'failed' && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-red/20 text-red">
+                  {diff.test_results.tests_failed} FAILED
+                </span>
+              )}
+              {diff.test_results.status === 'skipped' && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-text-muted/20 text-text-muted">
+                  SKIPPED
+                </span>
+              )}
+            </div>
+            {diff.test_results.failures.length > 0 && (
+              <div className="mt-2">
+                {diff.test_results.failures.map((f, i) => (
+                  <div key={i} className="text-sm text-red pl-3 mb-1">- {f}</div>
+                ))}
+              </div>
+            )}
+            {diff.test_results.duration_ms > 0 && diff.test_results.status !== 'running' && (
+              <div className="text-xs text-text-muted mt-1">
+                Completed in {(diff.test_results.duration_ms / 1000).toFixed(1)}s
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* File Tree + Diff */}
       <div className="grid grid-cols-[250px_1fr] gap-6">
         {/* File tree sidebar */}
@@ -319,6 +363,7 @@ export function DiffReview({ task }: DiffReviewProps) {
           onRequestChanges={handleRequestChanges}
           onReject={handleReject}
           loading={actionLoading}
+          testStatus={diff.test_results?.status ?? null}
         />
       </div>
     </div>

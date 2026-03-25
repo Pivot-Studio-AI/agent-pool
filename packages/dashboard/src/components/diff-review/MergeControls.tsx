@@ -7,6 +7,7 @@ interface MergeControlsProps {
   onRequestChanges: (comments: string) => void;
   onReject: () => void;
   loading?: boolean;
+  testStatus?: 'running' | 'passed' | 'failed' | 'skipped' | null;
 }
 
 export function MergeControls({
@@ -15,7 +16,11 @@ export function MergeControls({
   onRequestChanges,
   onReject,
   loading = false,
+  testStatus = null,
 }: MergeControlsProps) {
+  const testsRunning = testStatus === 'running';
+  const testsFailed = testStatus === 'failed';
+  const mergeDisabled = loading || testsRunning;
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState('');
 
@@ -38,9 +43,9 @@ export function MergeControls({
           variant="merge"
           onClick={onMerge}
           loading={loading}
-          disabled={loading}
+          disabled={mergeDisabled}
         >
-          Approve & Merge
+          {testsRunning ? 'Tests Running...' : testsFailed ? 'Merge Anyway' : 'Approve & Merge'}
         </Button>
         <Button
           variant="default"

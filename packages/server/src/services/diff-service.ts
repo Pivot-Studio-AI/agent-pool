@@ -15,6 +15,7 @@ export interface DiffRow {
   summary: string | null;
   compliance: Record<string, unknown> | null;
   audit: Record<string, unknown> | null;
+  test_results: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -105,4 +106,26 @@ export async function getLatestDiffFeedback(taskId: string): Promise<string | nu
     [taskId],
   );
   return result.rows[0]?.review_feedback ?? null;
+}
+
+/**
+ * Update the test results on the latest diff for a task.
+ * Broadcasts the update via WebSocket so the dashboard can update in real-time.
+ */
+export async function updateTestResults(taskId: string, testResults: Record<string, unknown>): Promise<void> {
+  const latest = await query<{ id: string }>(
+    'SELECT id FROM diffs WHERE task_id = $1 ORDER BY created_at DESC LIMIT 1',
+    [taskId],
+  );
+
+  if (latest.rows.length === 0) {
+    throw new Error(`No diffs found for task ${taskId}`);
+  }
+
+  await query(
+    'UPDATE diffs SET test_results = $1 WHERE id = $2',
+    [JSON.stringify(testResults), latest.rows[0].id],
+  );
+
+  broadcast('diffs', 'diffs.tests_updated', { task_id: taskId, test_results: testResults });
 }

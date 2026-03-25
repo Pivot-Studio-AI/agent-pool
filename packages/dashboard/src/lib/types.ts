@@ -48,6 +48,15 @@ export interface Diff {
     quality: string[];
     verdict: 'pass' | 'concerns' | 'fail';
   } | null;
+  test_results: {
+    status: 'running' | 'passed' | 'failed' | 'skipped';
+    tests_written: number;
+    tests_passed: number;
+    tests_failed: number;
+    failures: string[];
+    duration_ms: number;
+    summary: string;
+  } | null;
   created_at: string;
 }
 

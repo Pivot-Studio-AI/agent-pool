@@ -44,7 +44,14 @@ export function useWebSocket() {
 
         case 'plan.submitted':
         case 'plan.reviewed': {
-          // Another agent's view components will handle refetching plans
+          break;
+        }
+
+        case 'diffs.tests_updated': {
+          // Test results updated — force task store to refresh so DiffReview re-fetches
+          if (data?.task_id) {
+            addToast('Test results updated', data.task_id);
+          }
           break;
         }
 

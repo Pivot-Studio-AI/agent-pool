@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { submitDiff, getDiffs, getLatestDiffFeedback } from '../services/diff-service.js';
+import { submitDiff, getDiffs, getLatestDiffFeedback, updateTestResults } from '../services/diff-service.js';
 
 export const diffRouter = Router();
 
@@ -56,6 +56,19 @@ diffRouter.get('/:id/diffs/feedback', async (req, res, next) => {
   try {
     const feedback = await getLatestDiffFeedback(req.params.id);
     res.json({ data: { feedback } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /tasks/:id/diffs/tests — Update test results on latest diff
+// ---------------------------------------------------------------------------
+diffRouter.patch('/:id/diffs/tests', async (req, res, next) => {
+  try {
+    const testResults = req.body;
+    await updateTestResults(req.params.id, testResults);
+    res.json({ data: { updated: true } });
   } catch (err) {
     next(err);
   }

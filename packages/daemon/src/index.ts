@@ -539,7 +539,22 @@ async function runAgentLifecycle(
 
     // 8. Await review
     await api.updateTaskStatus(taskId, 'awaiting_review');
+
+    // 8a. Start QA agent in background (runs in parallel with your review)
+    const qaPromise = runQAAgent(taskId, worktreePath, diffStats.filesChanged.map(f => f.path))
+      .then(async (testResults) => {
+        await api.updateDiffTestResults(taskId, testResults as unknown as Record<string, unknown>);
+        console.log(`[qa:${taskId.slice(0, 8)}] Tests: ${testResults.status} (${testResults.tests_passed}/${testResults.tests_written} passed, ${testResults.duration_ms}ms)`);
+      })
+      .catch(async (err) => {
+        console.error(`[qa:${taskId.slice(0, 8)}] QA failed:`, err);
+        await api.updateDiffTestResults(taskId, { status: 'failed', summary: 'QA agent crashed', failures: [String(err)] }).catch(() => {});
+      });
+
     const reviewDecision = await waitForReviewDecision(taskId);
+
+    // Wait for QA to finish before proceeding (worktree must be stable for merge)
+    await qaPromise.catch(() => {});
 
     if (shuttingDown) return;
 
@@ -559,8 +574,11 @@ async function runAgentLifecycle(
       }
 
       if (currentReviewDecision === 'approved') {
-        // Merge
-        await api.updateTaskStatus(taskId, 'merging');
+        // Merge — dashboard may have already transitioned to 'merging'
+        const preMergeTask = await api.getTask(taskId);
+        if (preMergeTask.status !== 'merging') {
+          await api.updateTaskStatus(taskId, 'merging');
+        }
         const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
 
         if (!mergeResult.success) {
@@ -1004,12 +1022,10 @@ PLAN APPROVED. Proceed with implementation.
 ${fileListSection}
 REQUIREMENTS:
 1. Implement all changes described in the approved plan.
-2. Write tests for your changes. If the project has an existing test framework, use it. If not, create appropriate test files.
-3. Run the tests to verify they pass before finishing.
-4. Only modify files listed in the approved file manifest unless you discover a genuine need to touch additional files.
-5. Commit your changes when done with a clear commit message describing what was changed and why.
+2. Only modify files listed in the approved file manifest unless you discover a genuine need to touch additional files.
+3. Commit your changes when done with a clear commit message.
 
-Do not skip writing tests. The reviewer will check for test coverage.`;
+Focus on clean, correct implementation. Tests will be handled separately by QA.`;
 }
 
 function buildChangesPrompt(task: api.Task, feedback: string, repoPath?: string): string {
@@ -1039,9 +1055,7 @@ ${feedback}
 
 REQUIREMENTS:
 1. Make the requested changes. Focus specifically on what the reviewer asked for.
-2. Update or add tests to cover the changes.
-3. Run tests to verify they pass.
-4. Commit your changes when done.`;
+2. Commit your changes when done.`;
 }
 
 // ---- Code Audit ----
@@ -1162,6 +1176,129 @@ function parseAuditResponse(text: string): AuditResult {
   return {
     summary,
     audit: { bugs, security, testing, quality, verdict },
+  };
+}
+
+// ---- QA Agent ----
+
+interface TestResults {
+  status: 'running' | 'passed' | 'failed' | 'skipped';
+  tests_written: number;
+  tests_passed: number;
+  tests_failed: number;
+  failures: string[];
+  duration_ms: number;
+  summary: string;
+}
+
+async function runQAAgent(
+  taskId: string,
+  worktreePath: string,
+  filesChanged: string[]
+): Promise<TestResults> {
+  const startTime = Date.now();
+
+  // Notify server that tests are running
+  await api.updateDiffTestResults(taskId, { status: 'running', summary: 'QA agent starting...' });
+
+  const fileList = filesChanged.map(f => `- ${f}`).join('\n');
+
+  const qaPrompt = `You are a QA engineer. A developer just made changes to this codebase. Your working directory is a git worktree with the changes already committed.
+
+FILES MODIFIED:
+${fileList}
+
+Your job:
+1. Read the changed files to understand what was modified.
+2. Write focused smoke tests for the changes. Target the specific functions/logic that changed.
+3. Run the tests to verify they pass.
+4. Commit the test files when done.
+
+Guidelines:
+- Write ONLY tests for the changed code, not the entire codebase.
+- Keep tests focused: 3-5 test cases per changed function.
+- Use the project's existing test framework if one exists. If not, use a simple approach.
+- If tests fail, try to fix them once. If they still fail, commit them anyway and report the failures.
+- Be fast. This is a smoke test, not a comprehensive test suite.
+- Do NOT modify the implementation code — only add test files.`;
+
+  try {
+    return new Promise((resolve) => {
+      const { process: proc, kill } = spawnAgent(worktreePath, qaPrompt, 'claude-haiku-4-5-20251001');
+      const parser = new OutputParser(proc.stdout!);
+
+      const timeout = setTimeout(() => {
+        kill();
+        resolve({
+          status: 'failed',
+          tests_written: 0,
+          tests_passed: 0,
+          tests_failed: 0,
+          failures: ['QA agent timed out after 120s'],
+          duration_ms: Date.now() - startTime,
+          summary: 'QA agent timed out',
+        });
+      }, 120_000); // 2 min timeout for QA
+
+      const finish = () => {
+        clearTimeout(timeout);
+        const text = parser.getCollectedText();
+        const results = parseQAResults(text, Date.now() - startTime);
+        resolve(results);
+      };
+
+      parser.on('complete', finish);
+      proc.on('exit', finish);
+    });
+  } catch (err) {
+    return {
+      status: 'failed',
+      tests_written: 0,
+      tests_passed: 0,
+      tests_failed: 0,
+      failures: [err instanceof Error ? err.message : String(err)],
+      duration_ms: Date.now() - startTime,
+      summary: 'QA agent crashed',
+    };
+  }
+}
+
+function parseQAResults(text: string, durationMs: number): TestResults {
+  // Try to extract test counts from the agent's output
+  const passMatch = text.match(/(\d+)\s+(?:test|spec)s?\s+passed/i);
+  const failMatch = text.match(/(\d+)\s+(?:test|spec)s?\s+failed/i);
+  const totalMatch = text.match(/(\d+)\s+(?:test|spec)s?\s+(?:total|written|created)/i);
+
+  const passed = passMatch ? parseInt(passMatch[1], 10) : 0;
+  const failed = failMatch ? parseInt(failMatch[1], 10) : 0;
+  const total = totalMatch ? parseInt(totalMatch[1], 10) : passed + failed;
+
+  // Extract failure messages
+  const failures: string[] = [];
+  const failureSection = text.match(/(?:fail|error|FAIL).*?(?:\n.*?){0,3}/gi);
+  if (failureSection) {
+    for (const f of failureSection.slice(0, 5)) {
+      failures.push(f.trim().slice(0, 200));
+    }
+  }
+
+  const hasTests = total > 0 || text.toLowerCase().includes('test');
+  const status: TestResults['status'] = !hasTests ? 'skipped'
+    : failed > 0 ? 'failed'
+    : 'passed';
+
+  // Generate summary from agent output
+  const summaryLines = text.split('\n').filter(l => l.trim()).slice(-5);
+  const summary = summaryLines.join('\n').slice(0, 500) || 'Tests completed';
+
+  return {
+    status,
+    tests_written: total || (hasTests ? 1 : 0),
+    tests_passed: passed,
+    tests_failed: failed,
+    failures,
+    duration_ms: durationMs,
+    summary,
   };
 }
 
