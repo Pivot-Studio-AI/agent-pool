@@ -52,28 +52,16 @@ export function RepoSelector() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <div className="flex items-center gap-1.5">
-        {selectedRepo ? (
-          <a
-            href={selectedRepo.github_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-text-secondary hover:text-accent transition-colors truncate max-w-[200px]"
-            title={selectedRepo.github_full_name}
-          >
-            {selectedRepo.github_full_name}
-          </a>
-        ) : (
-          <span className="text-sm text-text-muted">Select a repo...</span>
-        )}
-        <button
-          onClick={() => setOpen(!open)}
-          className="p-1 text-text-muted hover:text-text-secondary transition-colors rounded hover:bg-surface-hover"
-          aria-label="Toggle repo selector"
-        >
-          <ChevronDown size={14} />
-        </button>
-      </div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors"
+        aria-label="Toggle repo selector"
+      >
+        <span className="text-sm truncate max-w-[200px]">
+          {selectedRepo ? selectedRepo.github_full_name : 'Select a repo...'}
+        </span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
 
       {open && (
         <div className="absolute top-full left-0 mt-2 w-80 bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
