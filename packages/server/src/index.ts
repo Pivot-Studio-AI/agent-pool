@@ -36,7 +36,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // Health check (no auth)
-app.get('/health', (_req, res) => { res.json({ status: 'ok' }); });
+app.get('/health', (_req, res) => { res.json({ status: 'ok', version: 'v7' }); });
 
 // Messaging webhooks — mounted BEFORE auth (Meta sends these directly)
 app.use('/api/v1/messaging', messagingRouter);
