@@ -41,6 +41,7 @@ daemonRouter.post('/register', async (req, res, next) => {
       const slotResult = await query(
         `INSERT INTO slots (slot_number, worktree_path, status)
          VALUES ($1, $2, 'idle')
+         ON CONFLICT (slot_number) DO UPDATE SET worktree_path = $2, status = 'idle'
          RETURNING *`,
         [i, worktreePath],
       );

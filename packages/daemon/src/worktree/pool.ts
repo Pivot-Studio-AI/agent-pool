@@ -49,7 +49,7 @@ export class WorktreePool {
         const message = err instanceof Error ? err.message : String(err);
         // If the branch already exists in another worktree, that's expected for the default branch
         // Try without creating a new branch
-        if (message.includes('already checked out') || message.includes('already exists')) {
+        if (message.includes('already checked out') || message.includes('already exists') || message.includes('already used by worktree')) {
           // The default branch may already be checked out in the main repo.
           // Create with a detached HEAD on the same commit instead.
           const { execFileSync } = await import('child_process');
