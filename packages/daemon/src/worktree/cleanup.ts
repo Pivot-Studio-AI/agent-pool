@@ -18,18 +18,22 @@ export function cleanupWorktree(
 ): void {
   console.log(`[cleanup] Cleaning up worktree at ${worktreePath}, task branch: ${taskBranch}`);
 
-  // 1. Checkout the default branch
+  // 1. Detach HEAD so we can delete the task branch.
+  // We can't checkout the default branch because git worktrees don't allow
+  // the same branch to be checked out in multiple worktrees.
   try {
-    checkoutBranch(worktreePath, defaultBranch);
+    execFileSync('git', ['-C', worktreePath, 'checkout', '--detach'], {
+      stdio: 'pipe',
+    });
   } catch (err: unknown) {
-    // If checkout fails (e.g. detached HEAD), try a hard reset approach
-    console.warn(`[cleanup] Checkout ${defaultBranch} failed, attempting reset:`, err);
+    console.warn(`[cleanup] Detach HEAD failed:`, err);
+    // Try harder — reset to the default branch's commit without checking it out
     try {
-      execFileSync('git', ['-C', worktreePath, 'checkout', '--force', defaultBranch], {
+      execFileSync('git', ['-C', worktreePath, 'checkout', '--detach', `origin/${defaultBranch}`], {
         stdio: 'pipe',
       });
     } catch (resetErr) {
-      console.error(`[cleanup] Force checkout also failed:`, resetErr);
+      console.error(`[cleanup] Detach to origin/${defaultBranch} also failed:`, resetErr);
     }
   }
 

@@ -53,7 +53,7 @@ export interface UpdateTaskFields {
 
 const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   queued:             ['planning', 'cancelled'],
-  planning:           ['awaiting_approval', 'cancelled'],
+  planning:           ['awaiting_approval', 'cancelled', 'errored'],
   awaiting_approval:  ['planning', 'executing', 'rejected', 'cancelled'],
   executing:          ['awaiting_review', 'errored', 'cancelled'],
   awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
