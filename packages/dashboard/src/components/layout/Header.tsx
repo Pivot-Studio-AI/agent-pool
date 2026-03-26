@@ -2,6 +2,7 @@ import { Bot } from 'lucide-react';
 import { TaskCreator } from '../tasks/TaskCreator';
 import { SlotIndicator } from '../slots/SlotIndicator';
 import { RepoSelector } from './RepoSelector';
+import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { useAuthStore } from '../../stores/auth-store';
 
@@ -40,6 +41,7 @@ export function Header({ isConnected }: HeaderProps) {
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green' : 'bg-red'}`} />
           <span className="text-xs text-text-muted">{isConnected ? 'Live' : 'Offline'}</span>
         </div>
+        <ThemeToggle />
         <UserMenu />
       </div>
     </header>
