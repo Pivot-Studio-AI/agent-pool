@@ -130,7 +130,7 @@ export function DiffReview({ task }: DiffReviewProps) {
 
   const totalAdditions = diff.additions;
   const totalDeletions = diff.deletions;
-  const filesChanged = diff.files_changed;
+  const filesChanged = diff.files_changed ?? [];
 
   // Parse compliance data with type safety
   const compliance = (() => {
@@ -232,7 +232,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 {diff.audit.verdict.toUpperCase()}
               </span>
             </div>
-            {diff.audit.bugs.length > 0 && (
+            {diff.audit.bugs?.length > 0 && (
               <div className="mb-2">
                 <div className="text-xs font-medium text-red mb-1">Bugs ({diff.audit.bugs.length})</div>
                 {diff.audit.bugs.map((b, i) => (
@@ -240,7 +240,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 ))}
               </div>
             )}
-            {diff.audit.security.length > 0 && (
+            {diff.audit.security?.length > 0 && (
               <div className="mb-2">
                 <div className="text-xs font-medium text-red mb-1">Security ({diff.audit.security.length})</div>
                 {diff.audit.security.map((s, i) => (
@@ -248,7 +248,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 ))}
               </div>
             )}
-            {diff.audit.testing.length > 0 && (
+            {diff.audit.testing?.length > 0 && (
               <div className="mb-2">
                 <div className="text-xs font-medium text-amber mb-1">Testing</div>
                 {diff.audit.testing.map((t, i) => (
@@ -256,7 +256,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 ))}
               </div>
             )}
-            {diff.audit.quality.length > 0 && (
+            {diff.audit.quality?.length > 0 && (
               <div className="mb-2">
                 <div className="text-xs font-medium text-text-secondary mb-1">Quality</div>
                 {diff.audit.quality.map((q, i) => (
@@ -264,7 +264,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 ))}
               </div>
             )}
-            {diff.audit.bugs.length === 0 && diff.audit.security.length === 0 && diff.audit.testing.length === 0 && diff.audit.quality.length === 0 && (
+            {!diff.audit.bugs?.length && !diff.audit.security?.length && !diff.audit.testing?.length && !diff.audit.quality?.length && (
               <div className="text-sm text-green">No issues found.</div>
             )}
           </div>
@@ -299,7 +299,7 @@ export function DiffReview({ task }: DiffReviewProps) {
                 </span>
               )}
             </div>
-            {diff.test_results.failures.length > 0 && (
+            {diff.test_results.failures?.length > 0 && (
               <div className="mt-2">
                 {diff.test_results.failures.map((f, i) => (
                   <div key={i} className="text-sm text-red pl-3 mb-1">- {f}</div>

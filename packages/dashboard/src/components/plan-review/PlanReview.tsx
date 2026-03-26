@@ -51,7 +51,7 @@ export function PlanReview({ task }: PlanReviewProps) {
 
       // Check file conflicts for the latest plan
       const latestPlan = data[data.length - 1];
-      if (latestPlan && latestPlan.file_manifest.length > 0) {
+      if (latestPlan && latestPlan.file_manifest?.length > 0) {
         try {
           const files = latestPlan.file_manifest.join(',');
           const conflictData = await api.get<FileConflict[]>(
