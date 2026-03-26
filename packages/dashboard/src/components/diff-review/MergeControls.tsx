@@ -20,7 +20,7 @@ export function MergeControls({
 }: MergeControlsProps) {
   const testsRunning = testStatus === 'running';
   const testsFailed = testStatus === 'failed';
-  const mergeDisabled = loading || testsRunning;
+  const mergeDisabled = loading;
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState('');
 
