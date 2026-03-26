@@ -200,13 +200,24 @@ export async function releaseSlot(slotId: string): Promise<void> {
 
 /**
  * Update a task's status.
+ * Treats 409 Conflict as success when the task is already in the target state
+ * (idempotent transition).
  */
 export async function updateTaskStatus(
   taskId: string,
   status: string,
   reason?: string
 ): Promise<Task> {
-  return request('PATCH', `/tasks/${taskId}`, { status, reason });
+  try {
+    return await request('PATCH', `/tasks/${taskId}`, { status, reason });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('HTTP 409') && message.includes(`from '${status}' to '${status}'`)) {
+      console.warn(`[api] Task ${taskId.slice(0, 8)} already in '${status}' state, treating as success.`);
+      return getTask(taskId);
+    }
+    throw err;
+  }
 }
 
 /**

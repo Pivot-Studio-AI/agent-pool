@@ -17,7 +17,7 @@ export function createBranch(
   branchName: string,
   baseBranch: string
 ): void {
-  execFileSync('git', ['-C', worktreePath, 'checkout', '-b', branchName, baseBranch], {
+  execFileSync('git', ['-C', worktreePath, 'checkout', '-B', branchName, baseBranch], {
     stdio: 'pipe',
   });
 }
