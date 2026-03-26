@@ -174,10 +174,11 @@ async function runFixedMode(): Promise<void> {
         for (const agent of activeAgents.values()) {
           agent.kill();
           try {
+            await api.updateTaskStatus(agent.taskId, 'errored', 'Daemon shutdown — task interrupted');
+          } catch { /* best effort */ }
+          try {
             await api.releaseSlot(agent.slotId);
-          } catch {
-            // Best effort
-          }
+          } catch { /* best effort */ }
         }
       }
     }
@@ -333,10 +334,11 @@ async function runDynamicMode(): Promise<void> {
         for (const agent of activeAgents.values()) {
           agent.kill();
           try {
+            await api.updateTaskStatus(agent.taskId, 'errored', 'Daemon shutdown — task interrupted');
+          } catch { /* best effort */ }
+          try {
             await api.releaseSlot(agent.slotId);
-          } catch {
-            // Best effort
-          }
+          } catch { /* best effort */ }
         }
       }
     }

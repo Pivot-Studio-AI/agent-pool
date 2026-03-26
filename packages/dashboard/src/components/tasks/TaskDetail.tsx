@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from 'react';
-import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban } from 'lucide-react';
+import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
 import { Badge } from '../shared/Badge';
@@ -70,6 +70,38 @@ function CancelButton({ task }: { task: Task }) {
   );
 }
 
+function RetryButton({ task }: { task: Task }) {
+  const [retrying, setRetrying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const updateTaskInStore = useTaskStore((s) => s.updateTaskInStore);
+
+  const handleRetry = useCallback(async () => {
+    setRetrying(true);
+    setError(null);
+    try {
+      const updated = await api.post<Task>(`/tasks/${task.id}/retry`);
+      updateTaskInStore(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retry task');
+    } finally {
+      setRetrying(false);
+    }
+  }, [task, updateTaskInStore]);
+
+  const retryableStatuses = ['errored', 'cancelled', 'rejected'];
+  if (!retryableStatuses.includes(task.status)) return null;
+
+  return (
+    <>
+      <Button variant="default" size="sm" onClick={handleRetry} loading={retrying} disabled={retrying}>
+        <RotateCcw size={14} className="mr-1" />
+        Retry
+      </Button>
+      {error && <span className="text-red text-xs">{error}</span>}
+    </>
+  );
+}
+
 function TaskMetadata({ task }: { task: Task }) {
   return (
     <div className="flex items-center gap-4 text-sm text-text-secondary flex-wrap">
@@ -80,6 +112,7 @@ function TaskMetadata({ task }: { task: Task }) {
       <span>Branch: {task.target_branch}</span>
       <span>Created {timeAgo(task.created_at)}</span>
       <CancelButton task={task} />
+      <RetryButton task={task} />
     </div>
   );
 }

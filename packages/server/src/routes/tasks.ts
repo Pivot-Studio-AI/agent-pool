@@ -155,6 +155,18 @@ taskRouter.post('/:id/cancel', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /tasks/:id/retry — Retry an errored/cancelled/rejected task
+// ---------------------------------------------------------------------------
+taskRouter.post('/:id/retry', async (req, res, next) => {
+  try {
+    const task = await updateTaskStatus(req.params.id, 'queued', 'Retried by user');
+    res.json({ data: task });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /tasks/:id/test-results — Update test results on latest diff
 // ---------------------------------------------------------------------------
 taskRouter.post('/:id/test-results', async (req, res, next) => {

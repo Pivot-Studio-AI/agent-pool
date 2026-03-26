@@ -69,11 +69,11 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
   merging:            ['deploying', 'errored', 'cancelled'],
   deploying:          ['completed', 'errored'],
-  // Terminal states — no outgoing transitions
+  // Terminal states — only allow retry (back to queued)
   completed:          [],
-  errored:            [],
-  rejected:           [],
-  cancelled:          [],
+  errored:            ['queued'],
+  rejected:           ['queued'],
+  cancelled:          ['queued'],
 };
 
 const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected', 'cancelled'] as const);
