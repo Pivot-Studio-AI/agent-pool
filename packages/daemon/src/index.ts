@@ -127,6 +127,13 @@ async function runFixedMode(): Promise<void> {
         return;
       }
 
+      // Immediately move task out of 'queued' so the next poll tick won't pick it up again
+      try {
+        await api.updateTaskStatus(task.id, 'planning');
+      } catch {
+        // If this fails, the lifecycle will retry — not fatal here
+      }
+
       console.log(
         `[daemon] Task "${task.title}" (${task.id}) claimed slot ${slot.slot_number}`
       );
@@ -272,6 +279,13 @@ async function runDynamicMode(): Promise<void> {
           } catch {
             // Another daemon claimed it first — skip
             return;
+          }
+
+          // Immediately move task out of 'queued' so the next poll tick won't pick it up again
+          try {
+            await api.updateTaskStatus(task.id, 'planning');
+          } catch {
+            // If this fails, the lifecycle will retry — not fatal here
           }
 
           console.log(
