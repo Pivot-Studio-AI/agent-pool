@@ -517,6 +517,42 @@ async function runAgentLifecycle(
       return;
     }
 
+    // 6b. Enforce plan manifest — revert changes to files not in the plan
+    if (planFileManifest.length > 0) {
+      const { execFileSync } = await import('child_process');
+      const normalizePath = (p: string) => p.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+      const planned = new Set(planFileManifest.map(normalizePath));
+
+      // Get list of files the agent actually changed
+      const changedFiles = execFileSync(
+        'git', ['-C', worktreePath, 'diff', '--name-only', `origin/${effectiveDefaultBranch}...HEAD`],
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+      ).trim().split('\n').filter(Boolean);
+
+      const offPlanFiles = changedFiles.filter(f => !planned.has(normalizePath(f)));
+      if (offPlanFiles.length > 0) {
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] Reverting ${offPlanFiles.length} off-plan file(s): ${offPlanFiles.join(', ')}`);
+        // Revert each off-plan file to its state on the base branch
+        for (const file of offPlanFiles) {
+          try {
+            execFileSync(
+              'git', ['-C', worktreePath, 'checkout', `origin/${effectiveDefaultBranch}`, '--', file],
+              { stdio: 'pipe' }
+            );
+          } catch {
+            console.warn(`[lifecycle:${taskId.slice(0, 8)}] Failed to revert ${file}, skipping`);
+          }
+        }
+        // Amend the commit to exclude the reverted files
+        execFileSync('git', ['-C', worktreePath, 'add', '-A'], { stdio: 'pipe' });
+        execFileSync(
+          'git', ['-C', worktreePath, 'commit', '--amend', '--no-edit'],
+          { stdio: 'pipe' }
+        );
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Off-plan changes reverted and commit amended.`);
+      }
+    }
+
     // 7. Generate and submit diff
     const diffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
     const diffStats = parseDiffStats(diffContent);
