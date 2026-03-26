@@ -20,35 +20,11 @@ export function TaskCreator() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  const addAttachmentRef = useRef<(file: File) => void>(() => {});
   const createTask = useTaskStore((s) => s.createTask);
-
-  // Handle paste events for clipboard images
-  useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      // Only handle paste if title input is focused
-      if (document.activeElement !== titleInputRef.current) return;
-
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf('image') !== -1) {
-          e.preventDefault();
-          const blob = items[i].getAsFile();
-          if (blob) {
-            addAttachment(blob);
-          }
-        }
-      }
-    };
-
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  }, []);
 
   const addAttachment = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Only image files are supported');
       return;
     }
 
@@ -65,6 +41,50 @@ export function TaskCreator() {
       }]);
     };
     reader.readAsDataURL(file);
+  }, []);
+
+  // Keep ref in sync so the paste handler always uses the latest version
+  addAttachmentRef.current = addAttachment;
+
+  // Handle paste events for clipboard images
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      // Only handle paste if title input is focused
+      if (document.activeElement !== titleInputRef.current) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Check if clipboard contains image files
+      const imageFiles: File[] = [];
+      let hasPlainText = false;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) {
+            imageFiles.push(blob);
+          }
+        }
+        if (items[i].type === 'text/plain') {
+          hasPlainText = true;
+        }
+      }
+
+      if (imageFiles.length === 0) return;
+
+      // If there's also plain text in the clipboard (e.g. copying from a webpage),
+      // let the default paste handle the text and just add the images as attachments.
+      // Only preventDefault when the clipboard has image-only content (e.g. screenshots).
+      if (!hasPlainText) {
+        e.preventDefault();
+      }
+
+      imageFiles.forEach(file => addAttachmentRef.current(file));
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
   }, []);
 
   const removeAttachment = useCallback((index: number) => {
@@ -140,73 +160,52 @@ export function TaskCreator() {
   return (
     <div className="flex-1 max-w-2xl mx-4">
       <div className="relative">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-2">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-text-muted hover:text-text-secondary transition-colors mt-2"
-              aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
-            >
-              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </button>
-            <div className="flex-1 relative">
-              <textarea
-                ref={titleInputRef}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                placeholder="Describe a task... (paste images or drag & drop)"
-                disabled={loading}
-                rows={3}
-                className={`w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 resize-none ${
-                  dragOver ? 'border-accent bg-accent/5' : ''
-                }`}
-              />
-              <div className="absolute right-2 top-1.5 flex items-center gap-1">
-                {attachments.length > 0 && (
-                  <span className="text-xs text-text-muted bg-surface px-1.5 py-0.5 rounded">
-                    {attachments.length} image{attachments.length !== 1 ? 's' : ''}
-                  </span>
-                )}
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-text-muted hover:text-text-secondary transition-colors mt-2"
+            aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
+          >
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
+          <div className="flex-1 relative">
+            <textarea
+              ref={titleInputRef}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              placeholder="Describe a task... (paste images or drag & drop)"
+              disabled={loading}
+              rows={3}
+              className={`w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 resize-none ${
+                dragOver ? 'border-accent bg-accent/5' : ''
+              }`}
+            />
+            <div className="absolute right-2 top-1.5 flex items-center gap-1">
+              {attachments.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-text-muted hover:text-text-secondary transition-colors p-1"
-                  title="Add image files"
+                  onClick={() => setExpanded(true)}
+                  className="flex items-center gap-1 text-xs text-accent bg-accent/10 px-1.5 py-0.5 rounded hover:bg-accent/20 transition-colors"
+                  title="View attached images"
                 >
-                  <Paperclip size={14} />
+                  <Image size={12} />
+                  {attachments.length}
                 </button>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-text-muted hover:text-text-secondary transition-colors p-1"
+                title="Add image files"
+              >
+                <Paperclip size={14} />
+              </button>
             </div>
           </div>
-
-          {/* Attachments Preview */}
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 ml-6">
-              {attachments.map((attachment, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={attachment.preview}
-                    alt={attachment.file.name}
-                    className="w-16 h-16 object-cover rounded border border-border"
-                  />
-                  <button
-                    onClick={() => removeAttachment(index)}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Remove image"
-                  >
-                    <X size={12} />
-                  </button>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b truncate">
-                    {attachment.file.name}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {expanded && (
@@ -258,6 +257,36 @@ export function TaskCreator() {
                 className="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
               />
             </div>
+
+            {/* Attachments Preview — inside expanded panel, not in the header */}
+            {attachments.length > 0 && (
+              <div>
+                <label className="block text-xs text-text-muted mb-1">
+                  Attachments ({attachments.length})
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((attachment, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={attachment.preview}
+                        alt={attachment.file.name}
+                        className="w-16 h-16 object-cover rounded border border-border"
+                      />
+                      <button
+                        onClick={() => removeAttachment(index)}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove image"
+                      >
+                        <X size={12} />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b truncate">
+                        {attachment.file.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end">
               <Button
