@@ -165,6 +165,18 @@ export function DiffReview({ task }: DiffReviewProps) {
         </div>
       </div>
 
+      {/* Actions — at top for quick access */}
+      <div className="border-b border-border pb-6">
+        <MergeControls
+          taskId={task.id}
+          onMerge={handleMerge}
+          onRequestChanges={handleRequestChanges}
+          onReject={handleReject}
+          loading={actionLoading}
+          testStatus={diff.test_results?.status ?? null}
+        />
+      </div>
+
       {/* Error banner */}
       {error && (
         <div className="bg-red/10 border border-red/30 rounded px-4 py-2 text-sm text-red">
@@ -355,17 +367,6 @@ export function DiffReview({ task }: DiffReviewProps) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="border-t border-border pt-6">
-        <MergeControls
-          taskId={task.id}
-          onMerge={handleMerge}
-          onRequestChanges={handleRequestChanges}
-          onReject={handleReject}
-          loading={actionLoading}
-          testStatus={diff.test_results?.status ?? null}
-        />
-      </div>
     </div>
   );
 }

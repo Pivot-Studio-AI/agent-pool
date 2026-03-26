@@ -149,6 +149,17 @@ export function PlanReview({ task }: PlanReviewProps) {
         </div>
       </div>
 
+      {/* Actions — at top for quick access */}
+      <div className="border-b border-border pb-6">
+        <ApprovalControls
+          taskId={task.id}
+          planId={plan.id}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          loading={actionLoading}
+        />
+      </div>
+
       {/* Error banner */}
       {error && (
         <div className="bg-red/10 border border-red/30 rounded px-4 py-2 text-sm text-red">
@@ -175,16 +186,6 @@ export function PlanReview({ task }: PlanReviewProps) {
         </Card>
       )}
 
-      {/* Actions */}
-      <div className="border-t border-border pt-6">
-        <ApprovalControls
-          taskId={task.id}
-          planId={plan.id}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          loading={actionLoading}
-        />
-      </div>
     </div>
   );
 }
