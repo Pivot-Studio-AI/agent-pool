@@ -1025,7 +1025,7 @@ function buildExecutionPrompt(task: api.Task, planFileManifest: string[], repoPa
     : '';
 
   const fileListSection = planFileManifest.length > 0
-    ? `\nAPPROVED FILE MANIFEST (only modify these files unless absolutely necessary):\n${planFileManifest.map(f => `- ${f}`).join('\n')}\n`
+    ? `\nAPPROVED FILE MANIFEST (ONLY modify these files):\n${planFileManifest.map(f => `- ${f}`).join('\n')}\n`
     : '';
 
   return `You are an AI coding agent working on a task. Your working directory is a git worktree.
@@ -1036,9 +1036,10 @@ ${claudeMdSection}
 PLAN APPROVED. Proceed with implementation.
 ${fileListSection}
 REQUIREMENTS:
-1. Implement all changes described in the approved plan.
-2. Only modify files listed in the approved file manifest unless you discover a genuine need to touch additional files.
-3. Commit your changes when done with a clear commit message.
+1. Implement ALL changes described in the approved plan. Do not skip any planned files.
+2. ONLY modify files listed in the approved file manifest. Do NOT touch any other files, even if you think they need changes. If a file is not in the manifest, leave it alone.
+3. Do NOT revert, "clean up", or modify existing code that is unrelated to your task. The codebase may contain recent changes from other developers — do not touch them.
+4. Commit your changes when done with a clear commit message.
 
 Focus on clean, correct implementation. Tests will be handled separately by QA.`;
 }
