@@ -25,9 +25,9 @@ import { readWorkspaceConfig, runSetup, runTeardown } from './worktree/lifecycle
 // ---- Model Routing ----
 
 const MODEL_MAP: Record<string, string> = {
-  fast: 'claude-opus-4-6-20250715',
-  default: 'claude-opus-4-6-20250715',
-  powerful: 'claude-opus-4-6-20250715',
+  fast: 'claude-opus-4-6',
+  default: 'claude-opus-4-6',
+  powerful: 'claude-opus-4-6',
 };
 
 /**
