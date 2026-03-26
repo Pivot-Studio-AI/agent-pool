@@ -88,7 +88,7 @@ export function Sidebar() {
   const recent = getRecentTasks(store);
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-64 bg-surface/50 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
+    <aside className="fixed left-0 top-28 bottom-0 w-64 bg-surface/50 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
       <div className="py-3">
         <Section
           title="Needs Attention"

@@ -19,7 +19,7 @@ export function TaskCreator() {
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const createTask = useTaskStore((s) => s.createTask);
 
   // Handle paste events for clipboard images
@@ -141,18 +141,17 @@ export function TaskCreator() {
     <div className="flex-1 max-w-2xl mx-4">
       <div className="relative">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-text-muted hover:text-text-secondary transition-colors"
+              className="text-text-muted hover:text-text-secondary transition-colors mt-2"
               aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
             >
               {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
             <div className="flex-1 relative">
-              <input
+              <textarea
                 ref={titleInputRef}
-                type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -161,11 +160,12 @@ export function TaskCreator() {
                 onDrop={handleDrop}
                 placeholder="Describe a task... (paste images or drag & drop)"
                 disabled={loading}
-                className={`w-full bg-bg border border-border rounded-lg px-3 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 ${
+                rows={3}
+                className={`w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 resize-none ${
                   dragOver ? 'border-accent bg-accent/5' : ''
                 }`}
               />
-              <div className="absolute right-2 top-2 flex items-center gap-1">
+              <div className="absolute right-2 top-1.5 flex items-center gap-1">
                 {attachments.length > 0 && (
                   <span className="text-xs text-text-muted bg-surface px-1.5 py-0.5 rounded">
                     {attachments.length} image{attachments.length !== 1 ? 's' : ''}
