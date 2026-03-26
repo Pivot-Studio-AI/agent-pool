@@ -20,6 +20,25 @@ Agent Pool is a personal AI development operations platform. It sits between a u
 
 ---
 
+## AGENT BEHAVIOR RULES
+
+- ONLY modify files listed in your approved plan manifest. Do NOT touch any other files.
+- Do NOT revert, "clean up", or modify existing code that is unrelated to your task.
+- The codebase contains recent changes from other developers — leave them alone.
+- Follow existing import patterns in each file (use default imports, e.g. `import multer from 'multer'`, not `import * as multer`).
+- If you encounter code that looks wrong but is not part of your task, leave it.
+- Implement ALL files listed in your plan. Do not skip planned files.
+
+## DEPLOYMENT
+
+- Server + dashboard auto-deploy via GitHub Actions on push to main.
+- GitHub Actions runs `railway up` to deploy to Railway production.
+- The daemon runs locally on the developer's machine and must be restarted manually after daemon code changes.
+- After merge and push, the daemon monitors the GitHub Actions deploy and reports status.
+- Task status flow: `merging` → `deploying` → `completed` (or `errored` if deploy fails).
+
+---
+
 ## PROJECT STRUCTURE
 
 ```

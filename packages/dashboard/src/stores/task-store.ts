@@ -101,7 +101,7 @@ export function getAttentionTasks(state: TaskState): Task[] {
 
 export function getActiveTasks(state: TaskState): Task[] {
   return Object.values(state.tasks).filter(
-    (t) => t.status === 'executing' || t.status === 'planning' || t.status === 'merging'
+    (t) => t.status === 'executing' || t.status === 'planning' || t.status === 'merging' || t.status === 'deploying'
   );
 }
 

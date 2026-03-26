@@ -553,6 +553,54 @@ async function runAgentLifecycle(
       }
     }
 
+    // 6c. Type-check gate with auto-fix loop
+    const MAX_TSC_FIX_ROUNDS = 3;
+    let tscErrors: string | null = null;
+    for (let tscRound = 0; tscRound < MAX_TSC_FIX_ROUNDS + 1; tscRound++) {
+      try {
+        const { execFileSync: execSync } = await import('child_process');
+        execSync('npx', ['tsc', '--noEmit'], {
+          cwd: worktreePath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 60_000,
+        });
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc passed${tscRound > 0 ? ` (after ${tscRound} fix round(s))` : ''}`);
+        tscErrors = null;
+        break;
+      } catch (tscErr: unknown) {
+        const stderr = tscErr instanceof Error && 'stderr' in tscErr
+          ? String((tscErr as any).stderr)
+          : String(tscErr);
+        tscErrors = stderr.slice(0, 3000);
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] tsc failed (round ${tscRound}): ${tscErrors.split('\n')[0]}`);
+
+        if (tscRound < MAX_TSC_FIX_ROUNDS) {
+          // Spawn a fix agent to resolve type errors
+          console.log(`[lifecycle:${taskId.slice(0, 8)}] Spawning fix agent for tsc errors (round ${tscRound + 1}/${MAX_TSC_FIX_ROUNDS})`);
+          try {
+            await runChangesAgent(taskId, worktreePath, task, agentEntry,
+              `TypeScript compilation errors found. Fix these errors:\n\n${tscErrors}`,
+              taskModel, effectiveRepoPath);
+          } catch {
+            console.warn(`[lifecycle:${taskId.slice(0, 8)}] Fix agent failed, continuing`);
+          }
+        }
+      }
+    }
+    // Store tsc results
+    if (tscErrors) {
+      await api.updateDiffTestResults(taskId, {
+        status: 'failed',
+        summary: `tsc --noEmit failed after ${MAX_TSC_FIX_ROUNDS} fix attempts`,
+        failures: tscErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 10),
+        tests_passed: 0,
+        tests_written: 0,
+        tests_failed: 1,
+        duration_ms: 0,
+      } as unknown as Record<string, unknown>).catch(() => {});
+    }
+
     // 7. Generate and submit diff
     const diffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
     const diffStats = parseDiffStats(diffContent);
@@ -649,8 +697,24 @@ async function runAgentLifecycle(
           return;
         }
 
-        await api.updateTaskStatus(taskId, 'completed');
-        console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed and merged!`);
+        // Monitor deployment
+        await api.updateTaskStatus(taskId, 'deploying');
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Pushed. Monitoring deploy...`);
+
+        try {
+          const deploySuccess = await waitForDeploy(taskId);
+          if (deploySuccess) {
+            await api.updateTaskStatus(taskId, 'completed');
+            console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed — deployed!`);
+          } else {
+            await api.updateTaskStatus(taskId, 'errored', 'GitHub Actions deploy failed');
+            console.error(`[lifecycle:${taskId.slice(0, 8)}] Deploy failed.`);
+          }
+        } catch (deployErr) {
+          const msg = deployErr instanceof Error ? deployErr.message : String(deployErr);
+          await api.updateTaskStatus(taskId, 'errored', msg);
+          console.error(`[lifecycle:${taskId.slice(0, 8)}] Deploy error: ${msg}`);
+        }
         return;
       } else if (currentReviewDecision === 'changes_requested') {
         if (changeRound >= MAX_CHANGE_ROUNDS) {
@@ -1276,7 +1340,7 @@ Guidelines:
 
   try {
     return new Promise((resolve) => {
-      const { process: proc, kill } = spawnAgent(worktreePath, qaPrompt, 'claude-haiku-4-5-20251001');
+      const { process: proc, kill } = spawnAgent(worktreePath, qaPrompt, 'claude-opus-4-6');
       const parser = new OutputParser(proc.stdout!);
 
       const timeout = setTimeout(() => {
@@ -1290,7 +1354,7 @@ Guidelines:
           duration_ms: Date.now() - startTime,
           summary: 'QA agent timed out',
         });
-      }, 120_000); // 2 min timeout for QA
+      }, 300_000); // 5 min timeout for QA
 
       const finish = () => {
         clearTimeout(timeout);
@@ -1374,6 +1438,40 @@ function checkPlanCompliance(
     missing,
     compliant: unexpected.length === 0 && missing.length === 0,
   };
+}
+
+// ---- Deploy Monitor ----
+
+async function waitForDeploy(taskId: string): Promise<boolean> {
+  const { execFileSync } = await import('child_process');
+  const DEPLOY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  const POLL_INTERVAL = 10_000; // 10 seconds
+  const start = Date.now();
+
+  // Wait a few seconds for GitHub Actions to pick up the push
+  await new Promise(r => setTimeout(r, 5000));
+
+  while (Date.now() - start < DEPLOY_TIMEOUT) {
+    try {
+      const output = execFileSync(
+        'gh', ['api', 'repos/Pivot-Studio-AI/agent-pool/actions/runs', '--jq', '.workflow_runs[0] | {status, conclusion}'],
+        { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 }
+      ).trim();
+
+      const run = JSON.parse(output);
+      if (run.status === 'completed') {
+        console.log(`[deploy:${taskId.slice(0, 8)}] GitHub Actions: ${run.conclusion}`);
+        return run.conclusion === 'success';
+      }
+      console.log(`[deploy:${taskId.slice(0, 8)}] GitHub Actions: ${run.status}... (${Math.round((Date.now() - start) / 1000)}s)`);
+    } catch (err) {
+      console.warn(`[deploy:${taskId.slice(0, 8)}] Failed to check deploy status:`, err instanceof Error ? err.message : err);
+    }
+
+    await new Promise(r => setTimeout(r, POLL_INTERVAL));
+  }
+
+  throw new Error('Deploy timed out after 5 minutes');
 }
 
 // ---- Polling Helpers ----

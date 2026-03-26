@@ -8,7 +8,7 @@ import type { PlanRow } from './plan-service.js';
 
 export type TaskStatus =
   | 'queued' | 'planning' | 'awaiting_approval' | 'executing'
-  | 'awaiting_review' | 'merging' | 'completed' | 'errored' | 'rejected' | 'cancelled';
+  | 'awaiting_review' | 'merging' | 'deploying' | 'completed' | 'errored' | 'rejected' | 'cancelled';
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
@@ -67,7 +67,8 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   awaiting_approval:  ['planning', 'executing', 'rejected', 'cancelled'],
   executing:          ['awaiting_review', 'errored', 'cancelled'],
   awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
-  merging:            ['completed', 'errored', 'cancelled'],
+  merging:            ['deploying', 'errored', 'cancelled'],
+  deploying:          ['completed', 'errored'],
   // Terminal states — no outgoing transitions
   completed:          [],
   errored:            [],
@@ -79,7 +80,7 @@ const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejec
 
 const ALL_STATUSES: Set<TaskStatus> = new Set([
   'queued', 'planning', 'awaiting_approval', 'executing',
-  'awaiting_review', 'merging', 'completed', 'errored', 'rejected', 'cancelled',
+  'awaiting_review', 'merging', 'deploying', 'completed', 'errored', 'rejected', 'cancelled',
 ] as const);
 
 /**
@@ -93,6 +94,7 @@ function eventTypeForTransition(from: TaskStatus, to: TaskStatus): string {
   if (to === 'executing' && from === 'awaiting_review') return 'review_changes_requested';
   if (to === 'awaiting_review') return 'execution_completed';
   if (to === 'merging') return 'merge_started';
+  if (to === 'deploying') return 'deploy_started';
   if (to === 'completed') return 'task_completed';
   if (to === 'errored') return 'task_errored';
   if (to === 'rejected') return 'task_rejected';

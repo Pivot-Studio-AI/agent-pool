@@ -193,6 +193,27 @@ function MergingView({ task }: { task: Task }) {
   );
 }
 
+function DeployingView({ task }: { task: Task }) {
+  return (
+    <div className="p-6 space-y-6 max-w-3xl">
+      <div>
+        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
+        <TaskMetadata task={task} />
+      </div>
+
+      <Card>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <Loader className="text-purple animate-spin" size={32} />
+          <div className="text-purple font-medium">Deploying to production...</div>
+          <div className="text-text-muted text-sm">
+            Monitoring GitHub Actions deploy
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function CompletedView({ task }: { task: Task }) {
   const icon =
     task.status === 'completed' ? (
@@ -263,6 +284,8 @@ export function TaskDetail() {
       return <ExecutingView task={task} />;
     case 'merging':
       return <MergingView task={task} />;
+    case 'deploying':
+      return <DeployingView task={task} />;
     case 'queued':
       return <QueuedView task={task} />;
     case 'planning':

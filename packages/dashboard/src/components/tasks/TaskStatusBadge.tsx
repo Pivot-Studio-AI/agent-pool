@@ -13,6 +13,7 @@ const statusConfig: Record<TaskStatus, { color: string; label: string }> = {
   executing: { color: 'green', label: 'Executing' },
   awaiting_review: { color: 'amber', label: 'Needs Review' },
   merging: { color: 'purple', label: 'Merging' },
+  deploying: { color: 'purple', label: 'Deploying' },
   completed: { color: 'green', label: 'Completed' },
   errored: { color: 'red', label: 'Errored' },
   rejected: { color: 'red', label: 'Rejected' },

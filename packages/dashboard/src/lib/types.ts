@@ -1,4 +1,4 @@
-export type TaskStatus = 'queued' | 'planning' | 'awaiting_approval' | 'executing' | 'awaiting_review' | 'merging' | 'completed' | 'errored' | 'rejected' | 'cancelled';
+export type TaskStatus = 'queued' | 'planning' | 'awaiting_approval' | 'executing' | 'awaiting_review' | 'merging' | 'deploying' | 'completed' | 'errored' | 'rejected' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type PlanStatus = 'pending' | 'approved' | 'rejected';
 export type SlotStatus = 'idle' | 'claimed' | 'active' | 'cleaning' | 'quarantined';
