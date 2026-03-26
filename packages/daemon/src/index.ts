@@ -555,57 +555,84 @@ async function runAgentLifecycle(
       }
     }
 
-    // 6c. Type-check gate with auto-fix loop
-    const MAX_TSC_FIX_ROUNDS = 3;
-    let tscErrors: string | null = null;
-    for (let tscRound = 0; tscRound < MAX_TSC_FIX_ROUNDS + 1; tscRound++) {
+    // 6c. Type-check gate — compare against baseline to only catch NEW errors
+    {
+      const { execFileSync: execSync } = await import('child_process');
+
+      // Get baseline tsc errors from the base branch
+      let baselineErrors = '';
       try {
-        const { execFileSync: execSync } = await import('child_process');
+        execSync('npx', ['tsc', '--noEmit'], {
+          cwd: effectiveRepoPath,
+          encoding: 'utf-8',
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 60_000,
+        });
+      } catch (baseErr: unknown) {
+        baselineErrors = (baseErr as any)?.stdout || (baseErr as any)?.stderr || '';
+      }
+      const baselineErrorCount = (baselineErrors.match(/error TS/g) || []).length;
+
+      // Check the agent's worktree
+      let agentErrors = '';
+      let agentErrorCount = 0;
+      try {
         execSync('npx', ['tsc', '--noEmit'], {
           cwd: worktreePath,
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 60_000,
         });
-        console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc passed${tscRound > 0 ? ` (after ${tscRound} fix round(s))` : ''}`);
-        tscErrors = null;
-        break;
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc passed (0 errors)`);
       } catch (tscErr: unknown) {
-        const stderr = tscErr instanceof Error && 'stderr' in tscErr
-          ? String((tscErr as any).stderr)
-          : String(tscErr);
-        tscErrors = stderr.slice(0, 3000);
-        console.warn(`[lifecycle:${taskId.slice(0, 8)}] tsc failed (round ${tscRound}): ${tscErrors.split('\n')[0]}`);
+        agentErrors = (tscErr as any)?.stdout || (tscErr as any)?.stderr || '';
+        agentErrorCount = (agentErrors.match(/error TS/g) || []).length;
+      }
 
-        if (tscRound < MAX_TSC_FIX_ROUNDS) {
-          // Spawn a fix agent to resolve type errors
-          console.log(`[lifecycle:${taskId.slice(0, 8)}] Spawning fix agent for tsc errors (round ${tscRound + 1}/${MAX_TSC_FIX_ROUNDS})`);
+      const newErrors = agentErrorCount - baselineErrorCount;
+      if (newErrors > 0) {
+        console.warn(`[lifecycle:${taskId.slice(0, 8)}] tsc: ${newErrors} NEW error(s) (agent: ${agentErrorCount}, baseline: ${baselineErrorCount})`);
+
+        // Try to fix new errors with up to 3 rounds
+        const MAX_TSC_FIX_ROUNDS = 3;
+        for (let round = 0; round < MAX_TSC_FIX_ROUNDS; round++) {
+          console.log(`[lifecycle:${taskId.slice(0, 8)}] Spawning fix agent for tsc errors (round ${round + 1}/${MAX_TSC_FIX_ROUNDS})`);
           try {
+            const newErrorLines = agentErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 20).join('\n');
             await runChangesAgent(taskId, worktreePath, task, agentEntry,
-              `TypeScript compilation errors found. Fix these errors:\n\n${tscErrors}`,
+              `TypeScript compilation errors found. Fix ONLY the errors in files you changed:\n\n${newErrorLines}`,
               taskModel, effectiveRepoPath);
-          } catch {
-            console.warn(`[lifecycle:${taskId.slice(0, 8)}] Fix agent failed, continuing`);
+          } catch { /* fix agent failed */ }
+
+          // Re-check
+          try {
+            execSync('npx', ['tsc', '--noEmit'], { cwd: worktreePath, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 60_000 });
+            console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc passed after fix round ${round + 1}`);
+            agentErrorCount = 0;
+            break;
+          } catch (recheck: unknown) {
+            agentErrors = (recheck as any)?.stdout || (recheck as any)?.stderr || '';
+            agentErrorCount = (agentErrors.match(/error TS/g) || []).length;
+            if (agentErrorCount <= baselineErrorCount) {
+              console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc: no new errors after fix round ${round + 1}`);
+              break;
+            }
           }
         }
+      } else {
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] tsc: no new errors (baseline: ${baselineErrorCount}, agent: ${agentErrorCount})`);
       }
-    }
-    // Store tsc results
-    if (tscErrors) {
-      await api.updateDiffTestResults(taskId, {
-        status: 'failed',
-        summary: `tsc --noEmit failed after ${MAX_TSC_FIX_ROUNDS} fix attempts`,
-        failures: tscErrors.split('\n').filter(l => l.includes('error TS')).slice(0, 10),
-        tests_passed: 0,
-        tests_written: 0,
-        tests_failed: 1,
-        duration_ms: 0,
-      } as unknown as Record<string, unknown>).catch(() => {});
     }
 
     // 7. Generate and submit diff
     const diffContent = generateDiff(worktreePath, effectiveDefaultBranch, branchName);
     const diffStats = parseDiffStats(diffContent);
+
+    if (!diffStats.diffContent.trim()) {
+      console.error(`[lifecycle:${taskId.slice(0, 8)}] Agent produced no changes. Marking as errored.`);
+      await api.updateTaskStatus(taskId, 'errored', 'Agent produced no code changes');
+      return;
+    }
 
     // Run code audit (summary + bug/security/testing check)
     const auditResult = await runCodeAudit(taskId, worktreePath, diffStats.diffContent, planFileManifest);
