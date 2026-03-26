@@ -170,6 +170,13 @@ export async function getQueuedTasks(): Promise<Task[]> {
 }
 
 /**
+ * Get tasks by status (for orphan cleanup).
+ */
+export async function getTasksByStatus(status: string): Promise<Task[]> {
+  return request('GET', `/tasks?status=${status}&limit=50`);
+}
+
+/**
  * Get all slots, filter client-side for idle ones.
  */
 export async function getIdleSlots(): Promise<Slot[]> {

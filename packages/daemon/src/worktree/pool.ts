@@ -33,6 +33,10 @@ export class WorktreePool {
       const wtPath = this.getWorktreePath(i);
 
       if (fs.existsSync(wtPath) && existingPaths.has(wtPath)) {
+        // Detach HEAD to release any task branch (prevents branch collision on retry)
+        try {
+          execFileSync('git', ['-C', wtPath, 'checkout', '--detach'], { stdio: 'pipe' });
+        } catch { /* already detached */ }
         if (!isWorktreeClean(wtPath)) {
           console.warn(`[pool] Slot ${i}: worktree is dirty, cleaning up...`);
           try {

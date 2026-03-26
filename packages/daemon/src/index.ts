@@ -102,11 +102,27 @@ async function runFixedMode(): Promise<void> {
   const pool = new WorktreePool(repoPath, config.poolSize, config.defaultBranch);
   await pool.provision();
 
-  // 4. Start heartbeat (every 30s)
+  // 4. Clean up orphaned tasks from previous daemon runs
+  try {
+    const orphanStatuses = ['planning', 'executing', 'merging', 'deploying'];
+    for (const status of orphanStatuses) {
+      const orphans = await api.getTasksByStatus(status);
+      for (const task of orphans) {
+        console.log(`[daemon] Cleaning up orphaned task ${task.id.slice(0, 8)} (was ${status})`);
+        try {
+          await api.updateTaskStatus(task.id, 'errored', `Orphaned in '${status}' — daemon restarted`);
+        } catch { /* may fail if transition is invalid, that's ok */ }
+      }
+    }
+  } catch (err) {
+    console.warn('[daemon] Orphan cleanup failed:', err instanceof Error ? err.message : err);
+  }
+
+  // 5. Start heartbeat (every 30s)
   const stopHeartbeat = startHeartbeat(daemonId, 30_000);
   console.log('[daemon] Heartbeat started (30s interval).');
 
-  // 5. Start polling loop
+  // 6. Start polling loop
   const stopPolling = startPolling(config.pollIntervalMs, async () => {
     if (shuttingDown) return;
 
