@@ -61,6 +61,15 @@ export async function claimSlot(
     _daemonId = taskIdOrDaemonId;
   }
 
+  // Prevent claiming a second slot for the same task
+  const existingSlot = await query<SlotRow>(
+    `SELECT id FROM slots WHERE current_task_id = $1 AND status IN ('claimed', 'active')`,
+    [_taskId],
+  );
+  if (existingSlot.rows.length > 0) {
+    throw new Error(`Task ${_taskId} already has a claimed slot`);
+  }
+
   let result;
 
   if (_slotId) {
