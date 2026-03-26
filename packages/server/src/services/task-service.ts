@@ -67,7 +67,7 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   awaiting_approval:  ['planning', 'executing', 'rejected', 'cancelled'],
   executing:          ['awaiting_review', 'errored', 'cancelled'],
   awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
-  merging:            ['completed', 'errored'],
+  merging:            ['completed', 'errored', 'cancelled'],
   // Terminal states — no outgoing transitions
   completed:          [],
   errored:            [],
