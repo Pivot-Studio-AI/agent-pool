@@ -83,6 +83,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   selectTask: (id) => {
     set({ selectedTaskId: id });
+    // Sync to URL
+    if (id) {
+      window.history.pushState(null, '', `/tasks/${id}`);
+    } else {
+      window.history.pushState(null, '', '/');
+    }
   },
 
   updateTaskInStore: (task) => {

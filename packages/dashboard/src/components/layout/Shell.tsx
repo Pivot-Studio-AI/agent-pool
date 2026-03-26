@@ -14,6 +14,7 @@ interface ShellProps {
 
 export function Shell({ isConnected }: ShellProps) {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const selectTask = useTaskStore((s) => s.selectTask);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
   const fetchSlots = useSlotStore((s) => s.fetchSlots);
   const fetchEvents = useEventStore((s) => s.fetchEvents);
@@ -22,6 +23,21 @@ export function Shell({ isConnected }: ShellProps) {
     fetchTasks();
     fetchSlots();
     fetchEvents();
+
+    // Restore task ID from URL on mount
+    const match = window.location.pathname.match(/^\/tasks\/([a-f0-9-]+)/);
+    if (match) {
+      // Set directly without pushing to history (we're already on this URL)
+      useTaskStore.setState({ selectedTaskId: match[1] });
+    }
+
+    // Handle browser back/forward
+    const handlePopState = () => {
+      const m = window.location.pathname.match(/^\/tasks\/([a-f0-9-]+)/);
+      useTaskStore.setState({ selectedTaskId: m ? m[1] : null });
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
