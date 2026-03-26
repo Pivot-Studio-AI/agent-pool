@@ -14,6 +14,7 @@ interface TaskState {
     priority?: string;
     target_branch?: string;
     model_tier?: string;
+    attachments?: File[];
   }) => Promise<Task>;
   selectTask: (id: string | null) => void;
   updateTaskInStore: (task: Task) => void;
@@ -45,15 +46,39 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   createTask: async (data) => {
     const selectedRepo = useAuthStore.getState().selectedRepo;
-    const body: Record<string, unknown> = { ...data };
-    if (selectedRepo?.id) {
-      body.repo_id = selectedRepo.id;
+
+    if (data.attachments && data.attachments.length > 0) {
+      // Use FormData for file uploads
+      const formData = new FormData();
+      formData.append('title', data.title);
+      if (data.description) formData.append('description', data.description);
+      if (data.priority) formData.append('priority', data.priority);
+      if (data.target_branch) formData.append('target_branch', data.target_branch);
+      if (data.model_tier) formData.append('model_tier', data.model_tier);
+      if (selectedRepo?.id) formData.append('repo_id', selectedRepo.id);
+
+      data.attachments.forEach((file, index) => {
+        formData.append(`attachments`, file);
+      });
+
+      const task = await api.postFormData<Task>('/tasks', formData);
+      set((state) => ({
+        tasks: { ...state.tasks, [task.id]: task },
+      }));
+      return task;
+    } else {
+      // Regular JSON request for tasks without attachments
+      const body: Record<string, unknown> = { ...data };
+      delete body.attachments;
+      if (selectedRepo?.id) {
+        body.repo_id = selectedRepo.id;
+      }
+      const task = await api.post<Task>('/tasks', body);
+      set((state) => ({
+        tasks: { ...state.tasks, [task.id]: task },
+      }));
+      return task;
     }
-    const task = await api.post<Task>('/tasks', body);
-    set((state) => ({
-      tasks: { ...state.tasks, [task.id]: task },
-    }));
-    return task;
   },
 
   selectTask: (id) => {

@@ -12,6 +12,15 @@ export type TaskStatus =
 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 
+export interface TaskAttachmentRow {
+  id: string;
+  task_id: string;
+  filename: string;
+  content_type: string;
+  file_size: number;
+  created_at: string;
+}
+
 export interface TaskRow {
   id: string;
   title: string;
@@ -21,6 +30,7 @@ export interface TaskRow {
   model_tier: string;
   target_branch: string;
   parent_task_id: string | null;
+  attachments?: TaskAttachmentRow[];
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -65,12 +75,12 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   cancelled:          [],
 };
 
-const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected', 'cancelled']);
+const TERMINAL_STATES: Set<TaskStatus> = new Set(['completed', 'errored', 'rejected', 'cancelled'] as const);
 
-const ALL_STATUSES: Set<string> = new Set([
+const ALL_STATUSES: Set<TaskStatus> = new Set([
   'queued', 'planning', 'awaiting_approval', 'executing',
   'awaiting_review', 'merging', 'completed', 'errored', 'rejected', 'cancelled',
-]);
+] as const);
 
 /**
  * Map a status transition to its corresponding event type.
@@ -123,16 +133,63 @@ export async function createTask(data: CreateTaskData): Promise<TaskRow> {
 }
 
 /**
+ * Create a new task with file attachments.
+ */
+export async function createTaskWithAttachments(
+  data: CreateTaskData,
+  files: Express.Multer.File[]
+): Promise<TaskRow> {
+  // Create the task first
+  const task = await createTask(data);
+
+  // Process and store attachments
+  const attachmentPromises = files.map(async (file) => {
+    const result = await query<TaskAttachmentRow>(
+      `INSERT INTO task_attachments (task_id, filename, content_type, file_size, file_data)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, task_id, filename, content_type, file_size, created_at`,
+      [
+        task.id,
+        file.originalname,
+        file.mimetype,
+        file.size,
+        file.buffer,
+      ]
+    );
+    return result.rows[0];
+  });
+
+  const attachments = await Promise.all(attachmentPromises);
+
+  // Return task with attachments
+  return {
+    ...task,
+    attachments,
+  };
+}
+
+/**
  * Get a task by ID. Throws if not found.
  */
 export async function getTask(id: string): Promise<TaskRow> {
-  const result = await query<TaskRow>('SELECT * FROM tasks WHERE id = $1', [id]);
+  const taskResult = await query<TaskRow>('SELECT * FROM tasks WHERE id = $1', [id]);
 
-  if (result.rows.length === 0) {
+  if (taskResult.rows.length === 0) {
     throw new Error(`Task not found: ${id}`);
   }
 
-  return result.rows[0];
+  const task = taskResult.rows[0];
+
+  // Fetch attachments for the task
+  const attachmentResult = await query<TaskAttachmentRow>(
+    'SELECT id, task_id, filename, content_type, file_size, created_at FROM task_attachments WHERE task_id = $1 ORDER BY created_at ASC',
+    [id]
+  );
+
+  return {
+    ...task,
+    attachments: attachmentResult.rows,
+  };
 }
 
 /**
@@ -166,21 +223,30 @@ export async function listTasks(filters: ListTasksFilters = {}): Promise<TaskRow
   const limit = filters.limit ?? 100;
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const result = await query<TaskRow>(
-    `SELECT * FROM tasks ${where}
+  const result = await query<TaskRow & { attachment_count?: number }>(
+    `SELECT t.*,
+       (SELECT COUNT(*) FROM task_attachments ta WHERE ta.task_id = t.id) as attachment_count
+     FROM tasks t ${where}
      ORDER BY
-       CASE priority
+       CASE t.priority
          WHEN 'critical' THEN 0
          WHEN 'high'     THEN 1
          WHEN 'medium'   THEN 2
          WHEN 'low'      THEN 3
        END ASC,
-       created_at ASC
+       t.created_at ASC
      LIMIT $${paramIdx}`,
     [...params, limit],
   );
 
-  return result.rows;
+  return result.rows.map(row => {
+    const { attachment_count, ...task } = row;
+    return {
+      ...task,
+      attachments: [], // Don't load full attachments in list view for performance
+      attachment_count: Number(attachment_count || 0),
+    };
+  });
 }
 
 /**
@@ -193,7 +259,7 @@ export async function updateTaskStatus(
   newStatus: string,
   reason?: string,
 ): Promise<TaskRow> {
-  if (!ALL_STATUSES.has(newStatus)) {
+  if (!ALL_STATUSES.has(newStatus as TaskStatus)) {
     throw new Error(`Invalid status: '${newStatus}'`);
   }
 

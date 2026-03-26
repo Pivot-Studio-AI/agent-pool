@@ -13,7 +13,7 @@ export function Header({ isConnected }: HeaderProps) {
   const selectedRepo = useAuthStore((s) => s.selectedRepo);
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-14 bg-surface/80 backdrop-blur-md border-b border-border z-30 flex items-center px-5">
+    <header className="fixed top-0 left-0 right-0 h-28 bg-surface/80 backdrop-blur-md border-b border-border z-30 flex items-center px-5">
       {/* Left: Logo */}
       <div className="flex items-center gap-2.5">
         <div className="flex items-center justify-center w-8 h-8 rounded-md bg-accent/10 border border-accent/20">
