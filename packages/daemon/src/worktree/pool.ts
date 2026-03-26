@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
-import { createWorktree, listWorktrees } from '../git/worktree.js';
+import { execFileSync } from 'child_process';
+import { createWorktree, listWorktrees, isWorktreeClean } from '../git/worktree.js';
 
 export class WorktreePool {
   private repoPath: string;
@@ -32,7 +33,16 @@ export class WorktreePool {
       const wtPath = this.getWorktreePath(i);
 
       if (fs.existsSync(wtPath) && existingPaths.has(wtPath)) {
-        console.log(`[pool] Slot ${i}: worktree already exists at ${wtPath}`);
+        if (!isWorktreeClean(wtPath)) {
+          console.warn(`[pool] Slot ${i}: worktree is dirty, cleaning up...`);
+          try {
+            execFileSync('git', ['-C', wtPath, 'checkout', '.'], { stdio: 'pipe' });
+            execFileSync('git', ['-C', wtPath, 'clean', '-fd'], { stdio: 'pipe' });
+          } catch (cleanErr) {
+            console.error(`[pool] Slot ${i}: failed to clean dirty worktree:`, cleanErr);
+          }
+        }
+        console.log(`[pool] Slot ${i}: worktree ready at ${wtPath}`);
         continue;
       }
 

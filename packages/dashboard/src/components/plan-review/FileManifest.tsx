@@ -13,7 +13,7 @@ interface FileManifestProps {
   conflicts?: FileConflict[];
 }
 
-export function FileManifest({ files, conflicts = [] }: FileManifestProps) {
+export function FileManifest({ files = [], conflicts = [] }: FileManifestProps) {
   const conflictMap = new Map(
     conflicts.map((c) => [c.filePath, c])
   );

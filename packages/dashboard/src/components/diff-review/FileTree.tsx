@@ -9,7 +9,7 @@ interface FileTreeProps {
   onFileClick: (path: string) => void;
 }
 
-export function FileTree({ files, onFileClick }: FileTreeProps) {
+export function FileTree({ files = [], onFileClick }: FileTreeProps) {
   return (
     <div className="space-y-1">
       <h3 className="text-sm font-bold text-text-primary mb-2">Changed Files</h3>

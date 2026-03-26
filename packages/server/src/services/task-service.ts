@@ -219,6 +219,9 @@ export async function updateTaskStatus(
   );
 
   const updated = result.rows[0];
+  if (!updated) {
+    throw new Error(`Task ${id} disappeared during status update (concurrent delete?)`);
+  }
 
   const evtType = eventTypeForTransition(task.status, typedStatus);
   await createEvent(updated.id, null, evtType as any, {
@@ -322,6 +325,9 @@ export async function updateTask(id: string, fields: UpdateTaskFields): Promise<
   );
 
   const updated = result.rows[0];
+  if (!updated) {
+    throw new Error(`Task ${id} disappeared during update (concurrent delete?)`);
+  }
   broadcast('tasks', 'task.updated', updated);
 
   return updated;

@@ -225,11 +225,11 @@ export function DiffReview({ task }: DiffReviewProps) {
             <div className="flex items-center gap-3 mb-3">
               <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Code Audit</div>
               <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                diff.audit.verdict === 'pass' ? 'bg-green/20 text-green' :
-                diff.audit.verdict === 'fail' ? 'bg-red/20 text-red' :
+                diff.audit?.verdict === 'pass' ? 'bg-green/20 text-green' :
+                diff.audit?.verdict === 'fail' ? 'bg-red/20 text-red' :
                 'bg-amber/20 text-amber'
               }`}>
-                {diff.audit.verdict.toUpperCase()}
+                {(diff.audit.verdict ?? 'unknown').toUpperCase()}
               </span>
             </div>
             {diff.audit.bugs?.length > 0 && (
@@ -285,12 +285,12 @@ export function DiffReview({ task }: DiffReviewProps) {
               )}
               {diff.test_results.status === 'passed' && (
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-green/20 text-green">
-                  {diff.test_results.tests_passed}/{diff.test_results.tests_written} PASSED
+                  {diff.test_results.tests_passed ?? 0}/{diff.test_results.tests_written ?? 0} PASSED
                 </span>
               )}
               {diff.test_results.status === 'failed' && (
                 <span className="px-2 py-0.5 rounded text-xs font-medium bg-red/20 text-red">
-                  {diff.test_results.tests_failed} FAILED
+                  {diff.test_results.tests_failed ?? 0} FAILED
                 </span>
               )}
               {diff.test_results.status === 'skipped' && (
@@ -306,9 +306,9 @@ export function DiffReview({ task }: DiffReviewProps) {
                 ))}
               </div>
             )}
-            {diff.test_results.duration_ms > 0 && diff.test_results.status !== 'running' && (
+            {(diff.test_results.duration_ms ?? 0) > 0 && diff.test_results.status !== 'running' && (
               <div className="text-xs text-text-muted mt-1">
-                Completed in {(diff.test_results.duration_ms / 1000).toFixed(1)}s
+                Completed in {((diff.test_results.duration_ms ?? 0) / 1000).toFixed(1)}s
               </div>
             )}
           </div>

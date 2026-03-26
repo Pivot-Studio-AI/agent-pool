@@ -377,16 +377,17 @@ async function runAgentLifecycle(
   activeAgents.set(taskId, agentEntry);
 
   try {
-    // 1. Prepare worktree
+    // 1. Prepare worktree — fetch latest remote state, then create task branch
     console.log(`[lifecycle:${taskId.slice(0, 8)}] Preparing worktree at ${worktreePath}`);
     try {
-      checkoutBranch(worktreePath, effectiveDefaultBranch);
+      const { execFileSync } = await import('child_process');
+      execFileSync('git', ['-C', worktreePath, 'fetch', 'origin', effectiveDefaultBranch], {
+        stdio: 'pipe',
+      });
     } catch {
-      // May already be on the right branch or in detached HEAD state
-      console.warn(`[lifecycle:${taskId.slice(0, 8)}] Checkout default branch warning, continuing...`);
+      console.warn(`[lifecycle:${taskId.slice(0, 8)}] fetch failed, continuing with local state`);
     }
-    pullLatest(worktreePath);
-    createBranch(worktreePath, branchName, effectiveDefaultBranch);
+    createBranch(worktreePath, branchName, `origin/${effectiveDefaultBranch}`);
 
     // 1b. Run workspace setup if configured
     const wsConfig = readWorkspaceConfig(effectiveRepoPath);
