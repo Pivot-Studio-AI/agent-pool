@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import { TaskCreator } from '../tasks/TaskCreator';
 import { SlotIndicator } from '../slots/SlotIndicator';
 import { RepoSelector } from './RepoSelector';
@@ -14,8 +15,13 @@ export function Header({ isConnected }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-surface/80 backdrop-blur-md border-b border-border z-30 flex items-center px-5">
       {/* Left: Logo */}
-      <div className="font-semibold text-text-primary text-base whitespace-nowrap tracking-tight">
-        Agent Pool
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-accent/10 border border-accent/20">
+          <Bot className="w-[18px] h-[18px] text-accent" strokeWidth={2} />
+        </div>
+        <div className="font-semibold text-text-primary text-base whitespace-nowrap tracking-tight">
+          Agent Pool
+        </div>
       </div>
 
       {/* Repo Selector */}
