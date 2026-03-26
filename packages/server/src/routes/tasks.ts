@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import * as multer from 'multer';
 import {
   createTask,
   getTask,
@@ -7,10 +8,32 @@ import {
   updateTaskStatus,
   updateTask,
   deleteTask,
+  createTaskWithAttachments,
 } from '../services/task-service.js';
 import { updateTestResults } from '../services/diff-service.js';
 
 export const taskRouter = Router();
+
+// ---------------------------------------------------------------------------
+// Multer Configuration for File Uploads
+// ---------------------------------------------------------------------------
+
+// Configure multer for memory storage (files stored in memory as Buffer)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 10, // Maximum 10 files
+  },
+  fileFilter: (req, file, cb) => {
+    // Only allow image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -40,13 +63,33 @@ const listTasksQuerySchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// POST /tasks — Create a task
+// POST /tasks — Create a task (handles both JSON and multipart form data)
 // ---------------------------------------------------------------------------
-taskRouter.post('/', async (req, res, next) => {
+taskRouter.post('/', upload.array('attachments'), async (req, res, next) => {
   try {
-    const data = createTaskSchema.parse(req.body);
-    const task = await createTask(data);
-    res.status(201).json({ data: task });
+    // Check if this is a multipart request with files
+    const files = req.files as Express.Multer.File[] | undefined;
+
+    if (files && files.length > 0) {
+      // Handle multipart form data with attachments
+      const formData: Record<string, unknown> = {};
+
+      if (req.body.title) formData.title = req.body.title;
+      if (req.body.description) formData.description = req.body.description;
+      if (req.body.priority) formData.priority = req.body.priority;
+      if (req.body.target_branch) formData.target_branch = req.body.target_branch;
+      if (req.body.model_tier) formData.model_tier = req.body.model_tier;
+      if (req.body.repo_id) formData.repo_id = req.body.repo_id;
+
+      const data = createTaskSchema.parse(formData);
+      const task = await createTaskWithAttachments(data, files);
+      res.status(201).json({ data: task });
+    } else {
+      // Handle regular JSON request
+      const data = createTaskSchema.parse(req.body);
+      const task = await createTask(data);
+      res.status(201).json({ data: task });
+    }
   } catch (err) {
     next(err);
   }

@@ -4,6 +4,15 @@ export type PlanStatus = 'pending' | 'approved' | 'rejected';
 export type SlotStatus = 'idle' | 'claimed' | 'active' | 'cleaning' | 'quarantined';
 export type EventType = 'task_created' | 'task_assigned' | 'plan_submitted' | 'plan_approved' | 'plan_rejected' | 'execution_started' | 'execution_progress' | 'agent_question' | 'execution_completed' | 'diff_ready' | 'review_approved' | 'review_rejected' | 'review_changes_requested' | 'merge_started' | 'merge_completed' | 'merge_failed' | 'task_completed' | 'task_errored' | 'task_rejected' | 'task_cancelled' | 'slot_claimed' | 'slot_released' | 'conflict_detected';
 
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  filename: string;
+  content_type: string;
+  file_size: number;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -13,6 +22,7 @@ export interface Task {
   model_tier: string;
   target_branch: string;
   parent_task_id: string | null;
+  attachments?: TaskAttachment[];
   created_at: string;
   updated_at: string;
   completed_at: string | null;

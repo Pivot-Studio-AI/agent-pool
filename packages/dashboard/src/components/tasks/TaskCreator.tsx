@@ -1,7 +1,12 @@
-import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect, DragEvent } from 'react';
+import { ChevronDown, ChevronRight, Paperclip, Upload, X, Image } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { Button } from '../shared/Button';
+
+interface AttachmentFile {
+  file: File;
+  preview?: string;
+}
 
 export function TaskCreator() {
   const [title, setTitle] = useState('');
@@ -11,7 +16,88 @@ export function TaskCreator() {
   const [targetBranch, setTargetBranch] = useState('main');
   const [modelTier, setModelTier] = useState('default');
   const [loading, setLoading] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const createTask = useTaskStore((s) => s.createTask);
+
+  // Handle paste events for clipboard images
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      // Only handle paste if title input is focused
+      if (document.activeElement !== titleInputRef.current) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const blob = items[i].getAsFile();
+          if (blob) {
+            addAttachment(blob);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
+
+  const addAttachment = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Only image files are supported');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAttachments(prev => [...prev, {
+        file,
+        preview: reader.result as string
+      }]);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(addAttachment);
+  }, [addAttachment]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(addAttachment);
+
+    // Reset input value to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [addAttachment]);
 
   const handleSubmit = useCallback(async () => {
     const trimmed = title.trim();
@@ -27,12 +113,14 @@ export function TaskCreator() {
           target_branch: targetBranch,
           model_tier: modelTier,
         }),
+        attachments: attachments.map(a => a.file),
       });
       setTitle('');
       setDescription('');
       setPriority('medium');
       setTargetBranch('main');
       setModelTier('default');
+      setAttachments([]);
       setExpanded(false);
     } catch (err) {
       console.error('Failed to create task:', err);
@@ -40,7 +128,7 @@ export function TaskCreator() {
     } finally {
       setLoading(false);
     }
-  }, [title, expanded, description, priority, targetBranch, modelTier, loading, createTask]);
+  }, [title, expanded, description, priority, targetBranch, modelTier, attachments, loading, createTask]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -50,25 +138,75 @@ export function TaskCreator() {
   };
 
   return (
-    <div className="flex-1 max-w-xl mx-4">
+    <div className="flex-1 max-w-2xl mx-4">
       <div className="relative">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-text-muted hover:text-text-secondary transition-colors"
-            aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
-          >
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </button>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Describe a task..."
-            disabled={loading}
-            className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50"
-          />
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-text-muted hover:text-text-secondary transition-colors"
+              aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
+            >
+              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </button>
+            <div className="flex-1 relative">
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                placeholder="Describe a task... (paste images or drag & drop)"
+                disabled={loading}
+                className={`w-full bg-bg border border-border rounded-lg px-3 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 ${
+                  dragOver ? 'border-accent bg-accent/5' : ''
+                }`}
+              />
+              <div className="absolute right-2 top-2 flex items-center gap-1">
+                {attachments.length > 0 && (
+                  <span className="text-xs text-text-muted bg-surface px-1.5 py-0.5 rounded">
+                    {attachments.length} image{attachments.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-text-muted hover:text-text-secondary transition-colors p-1"
+                  title="Add image files"
+                >
+                  <Paperclip size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Attachments Preview */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 ml-6">
+              {attachments.map((attachment, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={attachment.preview}
+                    alt={attachment.file.name}
+                    className="w-16 h-16 object-cover rounded border border-border"
+                  />
+                  <button
+                    onClick={() => removeAttachment(index)}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Remove image"
+                  >
+                    <X size={12} />
+                  </button>
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 rounded-b truncate">
+                    {attachment.file.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {expanded && (
@@ -134,6 +272,16 @@ export function TaskCreator() {
             </div>
           </div>
         )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
       </div>
     </div>
   );
