@@ -18,7 +18,7 @@ export interface ExtractedPlan {
  */
 export function extractPlan(agentText: string): ExtractedPlan | null {
   // Check if the plan header exists (case-insensitive, flexible formatting)
-  if (!findHeader(agentText, 'plan')) {
+  if (findHeader(agentText, 'plan') === -1) {
     return null;
   }
 

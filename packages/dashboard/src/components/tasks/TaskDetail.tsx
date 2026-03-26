@@ -215,6 +215,15 @@ function DeployingView({ task }: { task: Task }) {
 }
 
 function CompletedView({ task }: { task: Task }) {
+  const events = useEventStore((s) => s.events);
+  const errorReason = useMemo(() => {
+    if (task.status !== 'errored') return null;
+    const errorEvent = events.find(
+      (e) => e.task_id === task.id && e.event_type === 'task_errored'
+    );
+    return errorEvent?.payload?.reason as string | undefined;
+  }, [events, task.id, task.status]);
+
   const icon =
     task.status === 'completed' ? (
       <CheckCircle className="text-green" size={32} />
@@ -254,6 +263,11 @@ function CompletedView({ task }: { task: Task }) {
           {task.completed_at && (
             <div className="text-text-muted text-sm">
               Finished {timeAgo(task.completed_at)}
+            </div>
+          )}
+          {errorReason && (
+            <div className="text-red text-xs mt-2 px-4 max-w-lg text-center break-words">
+              {errorReason}
             </div>
           )}
         </div>
