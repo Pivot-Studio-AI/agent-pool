@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import * as multer from 'multer';
+import multer from 'multer';
 import {
   createTask,
   getTask,
