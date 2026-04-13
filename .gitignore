@@ -1,6 +1,54 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-.env
-pgdata/
-.worktrees/
+build/
 *.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# PostgreSQL data
+pgdata/
+
+# Git worktrees (managed by daemon)
+.worktrees/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage & testing
+coverage/
+*.lcov
+.nyc_output/
+
+# IDE & editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+
+# Vite
+packages/dashboard/.vite/
+
+# Agent status (daemon runtime)
+.agent-status
