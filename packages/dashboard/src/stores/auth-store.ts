@@ -13,6 +13,7 @@ interface AuthState {
 
   initialize: () => Promise<void>;
   login: () => void;
+  loginWithApiKey: (apiKey: string) => Promise<void>;
   logout: () => void;
   fetchGitHubRepos: () => Promise<void>;
   fetchKnownRepos: () => Promise<void>;
@@ -41,9 +42,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     const token = localStorage.getItem('agent-pool-token');
-    if (!token) {
+    const apiKey = localStorage.getItem('agent-pool-api-key');
+
+    if (!token && !apiKey) {
       set({ loading: false, isAuthenticated: false });
       return;
+    }
+
+    // API key auth — skip user fetch, just verify the key works
+    if (apiKey && !token) {
+      try {
+        await api.get<unknown[]>('/slots');
+        set({
+          user: { id: 'api-key', github_login: 'admin', github_avatar_url: '' } as unknown as User,
+          token: apiKey,
+          isAuthenticated: true,
+          loading: false,
+        });
+        return;
+      } catch {
+        localStorage.removeItem('agent-pool-api-key');
+        set({ loading: false, isAuthenticated: false });
+        return;
+      }
     }
 
     try {
@@ -66,7 +87,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: () => {
-    window.location.href = '/api/v1/auth/github';
+    window.location.href = `${import.meta.env.VITE_API_URL || ''}/api/v1/auth/github`;
+  },
+
+  loginWithApiKey: async (apiKey: string) => {
+    localStorage.setItem('agent-pool-api-key', apiKey);
+    try {
+      await api.get<unknown[]>('/slots');
+      set({
+        user: { id: 'api-key', github_login: 'admin', github_avatar_url: '' } as unknown as User,
+        token: apiKey,
+        isAuthenticated: true,
+        loading: false,
+      });
+    } catch {
+      localStorage.removeItem('agent-pool-api-key');
+      throw new Error('Invalid API key');
+    }
   },
 
   logout: () => {
