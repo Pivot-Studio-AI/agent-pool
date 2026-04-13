@@ -16,6 +16,8 @@ const configSchema = z.object({
   pollIntervalMs: z.number().int().positive().default(3000),
   defaultModel: z.string().default('claude-sonnet-4-20250514'),
   defaultBranch: z.string().default('main'),
+  integrationBranch: z.string().optional(),
+  spawnMode: z.enum(['headless', 'tmux']).default('headless'),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -32,6 +34,8 @@ function loadConfig(): Config {
       : undefined,
     defaultModel: process.env.DEFAULT_MODEL || undefined,
     defaultBranch: process.env.DEFAULT_BRANCH || undefined,
+    integrationBranch: process.env.INTEGRATION_BRANCH || undefined,
+    spawnMode: (process.env.SPAWN_MODE as 'headless' | 'tmux') || undefined,
   };
 
   const result = configSchema.safeParse(raw);

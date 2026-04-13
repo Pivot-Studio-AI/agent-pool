@@ -5,10 +5,10 @@ import { z } from 'zod';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Load .env from project root (../../.env relative to packages/server/)
+// Load .env from monorepo root
+dotenvConfig({ path: resolve(__dirname, '../../../.env') });
+// Also try two levels up (packages/server/.env fallback)
 dotenvConfig({ path: resolve(__dirname, '../../.env') });
-// Also try monorepo root
-dotenvConfig({ path: resolve(__dirname, '../../../../.env') });
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

@@ -21,6 +21,7 @@ import { cleanupWorktree } from './worktree/cleanup.js';
 import { ensureRepo } from './git/clone.js';
 import { createCheckpoint, cleanupCheckpoints } from './git/checkpoint.js';
 import { readWorkspaceConfig, runSetup, runTeardown } from './worktree/lifecycle.js';
+import { writeAgentStatus, broadcast } from './worktree/status.js';
 
 // ---- Model Routing ----
 
@@ -103,14 +104,35 @@ async function runFixedMode(): Promise<void> {
   await pool.provision();
 
   // 4. Clean up orphaned tasks from previous daemon runs
+  // Strategy: re-queue tasks that can be safely resumed, error tasks that can't
   try {
-    const orphanStatuses = ['planning', 'executing', 'merging', 'deploying'];
-    for (const status of orphanStatuses) {
+    // Tasks mid-agent-execution: code may be partial, re-queue to start fresh
+    for (const status of ['planning', 'executing'] as const) {
       const orphans = await api.getTasksByStatus(status);
       for (const task of orphans) {
-        console.log(`[daemon] Cleaning up orphaned task ${task.id.slice(0, 8)} (was ${status})`);
+        console.log(`[daemon] Re-queuing orphaned task ${task.id.slice(0, 8)} (was ${status})`);
         try {
           await api.updateTaskStatus(task.id, 'errored', `Orphaned in '${status}' — daemon restarted`);
+          await api.retryTask(task.id);
+        } catch { /* may fail if transition is invalid, that's ok */ }
+      }
+    }
+    // Tasks awaiting approval: plan exists, just needs user decision — leave them alone
+    {
+      const orphans = await api.getTasksByStatus('awaiting_approval');
+      for (const task of orphans) {
+        console.log(`[daemon] Task ${task.id.slice(0, 8)} is awaiting approval — will resume when approved`);
+      }
+    }
+    // Tasks mid-merge/deploy: approval was given but daemon died before completing
+    // Re-queue so the merge can be attempted again
+    for (const status of ['merging', 'deploying'] as const) {
+      const orphans = await api.getTasksByStatus(status);
+      for (const task of orphans) {
+        console.log(`[daemon] Re-queuing orphaned task ${task.id.slice(0, 8)} (was ${status}, will re-merge)`);
+        try {
+          await api.updateTaskStatus(task.id, 'errored', `Orphaned in '${status}' — daemon restarted`);
+          await api.retryTask(task.id);
         } catch { /* may fail if transition is invalid, that's ok */ }
       }
     }
@@ -379,6 +401,8 @@ async function runAgentLifecycle(
 ): Promise<void> {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
   const effectiveDefaultBranch = defaultBranch ?? config.defaultBranch;
+  // Integration branch: merges target this branch if configured, otherwise defaultBranch
+  const mergeBranchTarget = config.integrationBranch ?? effectiveDefaultBranch;
   const taskId = task.id;
   const slotId = slot.id;
   const slotNumber = slot.slot_number;
@@ -431,6 +455,22 @@ async function runAgentLifecycle(
 
     // 3. Update task status to planning
     await api.updateTaskStatus(taskId, 'planning');
+
+    // Write agent status for cross-agent awareness
+    const updateStatus = (phase: 'setup' | 'planning' | 'executing' | 'testing' | 'pr-open' | 'done' | 'failed' | 'blocked', filesChanged: string[] = []) => {
+      try {
+        writeAgentStatus(worktreePath, {
+          slot: slotNumber,
+          phase,
+          branch: branchName,
+          task: task.title,
+          taskId,
+          filesChanged,
+          updated: new Date().toISOString(),
+        });
+      } catch { /* best effort */ }
+    };
+    updateStatus('planning');
 
     // 4. Build the plan prompt
     const prompt = buildPlanPrompt(task, effectiveRepoPath);
@@ -524,6 +564,8 @@ async function runAgentLifecycle(
     if (preExecTask.status !== 'executing') {
       await api.updateTaskStatus(taskId, 'executing');
     }
+    updateStatus('executing', planFileManifest);
+    broadcast(worktreePath, `slot-${slotNumber}`, `Executing: ${task.title} — files: ${planFileManifest.join(', ')}`);
     await runExecutionAgent(taskId, worktreePath, task, agentEntry, planFileManifest, taskModel, effectiveRepoPath);
 
     if (shuttingDown) return;
@@ -723,7 +765,7 @@ async function runAgentLifecycle(
         if (preMergeTask.status !== 'merging') {
           await api.updateTaskStatus(taskId, 'merging');
         }
-        const mergeResult = mergeBranch(worktreePath, effectiveDefaultBranch, branchName);
+        const mergeResult = mergeBranch(worktreePath, mergeBranchTarget, branchName);
 
         if (!mergeResult.success) {
           console.error(
@@ -733,7 +775,7 @@ async function runAgentLifecycle(
           return;
         }
 
-        const pushResult = pushBranch(worktreePath, effectiveDefaultBranch);
+        const pushResult = pushBranch(worktreePath, mergeBranchTarget);
         if (!pushResult.success) {
           console.error(
             `[lifecycle:${taskId.slice(0, 8)}] Push failed: ${pushResult.error}`

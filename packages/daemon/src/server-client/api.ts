@@ -303,6 +303,13 @@ export async function cancelTask(taskId: string): Promise<Task> {
 }
 
 /**
+ * Retry a task (transitions from errored/rejected/cancelled → queued).
+ */
+export async function retryTask(taskId: string): Promise<Task> {
+  return request('POST', `/tasks/${taskId}/retry`);
+}
+
+/**
  * Update test results on the latest diff for a task.
  */
 export async function updateDiffTestResults(taskId: string, testResults: Record<string, unknown>): Promise<void> {

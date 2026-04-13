@@ -1,0 +1,22 @@
+{
+  "name": "@agent-pool/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "pool": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "link": "npm link"
+  },
+  "dependencies": {
+    "commander": "^12.1",
+    "chalk": "^5.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19",
+    "typescript": "^5.6"
+  }
+}
