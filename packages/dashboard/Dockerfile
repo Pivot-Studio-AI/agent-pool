@@ -3,9 +3,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+
+# Use standalone tsconfig (no monorepo extends) for Docker builds
+RUN cp tsconfig.docker.json tsconfig.json
+
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
-# Vite build doesn't need tsc — just bundles the app
 RUN npx vite build
 
 FROM node:20-alpine
