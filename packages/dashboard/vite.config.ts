@@ -10,4 +10,7 @@ export default defineConfig({
       '/ws': { target: 'ws://localhost:3100', ws: true },
     },
   },
+  define: {
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || ''),
+  },
 });

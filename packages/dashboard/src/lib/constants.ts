@@ -1,6 +1,12 @@
-export const API_BASE = '/api/v1';
+// In production, VITE_API_URL points to the Railway server (e.g., https://agent-pool-server-production.up.railway.app)
+// In dev, it's empty and the Vite proxy handles /api → localhost:3100
+const SERVER_URL = (import.meta.env.VITE_API_URL as string) || '';
 
-export const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+export const API_BASE = `${SERVER_URL}/api/v1`;
+
+export const WS_URL = SERVER_URL
+  ? `${SERVER_URL.replace('http', 'ws')}/ws`
+  : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
 export const STATUS_COLORS: Record<string, string> = {
   queued: 'text-text-muted',
