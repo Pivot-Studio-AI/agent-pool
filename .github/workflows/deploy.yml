@@ -29,7 +29,7 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy dashboard
-        run: cd packages/dashboard && railway up --detach --service agent-pool-dashboard
+        run: railway up --detach --service agent-pool-dashboard --dockerfile packages/dashboard/Dockerfile
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: 8e57601f-224a-42d4-8795-4b8125920358
