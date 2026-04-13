@@ -34,7 +34,9 @@ authRouter.get('/github', (_req, res) => {
   const state = crypto.randomBytes(20).toString('hex');
   pendingStates.set(state, Date.now() + 5 * 60 * 1000); // 5 min TTL
 
-  const redirectUri = `${config.dashboardUrl}/api/v1/auth/github/callback`;
+  // Callback goes to the SERVER (not dashboard — dashboard is a static SPA)
+  const serverOrigin = process.env.SERVER_PUBLIC_URL || `${_req.protocol}://${_req.get('host')}`;
+  const redirectUri = `${serverOrigin}/api/v1/auth/github/callback`;
   const url =
     `https://github.com/login/oauth/authorize` +
     `?client_id=${clientId}` +
