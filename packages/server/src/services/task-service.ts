@@ -292,11 +292,16 @@ export async function updateTaskStatus(
   }
 
   const evtType = eventTypeForTransition(task.status, typedStatus);
-  await createEvent(updated.id, null, evtType as any, {
-    from: task.status,
-    to: typedStatus,
-    ...(reason ? { reason } : {}),
-  });
+  try {
+    await createEvent(updated.id, null, evtType as any, {
+      from: task.status,
+      to: typedStatus,
+      ...(reason ? { reason } : {}),
+    });
+  } catch (evtErr) {
+    // Event logging should never block a status transition
+    console.warn(`[task-service] Failed to log event '${evtType}' for task ${id}:`, evtErr instanceof Error ? evtErr.message : evtErr);
+  }
 
   broadcast('tasks', 'task.updated', updated);
 
