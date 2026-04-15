@@ -16,10 +16,14 @@ describe('globals.css', () => {
 
   it('should define light theme CSS variables under .light', () => {
     expect(css).toContain('.light');
-    // Light theme should have different values than dark
     const lightSection = css.split('.light')[1]?.split('}')[0] ?? '';
     expect(lightSection).toContain('--color-bg');
     expect(lightSection).toContain('--color-surface');
+  });
+
+  it('should define surface-raised and border-subtle variables', () => {
+    expect(css).toContain('--color-surface-raised');
+    expect(css).toContain('--color-border-subtle');
   });
 
   it('should define fade-in animation', () => {
@@ -32,8 +36,38 @@ describe('globals.css', () => {
     expect(css).toContain('.animate-pulse-subtle');
   });
 
+  it('should define shimmer animation', () => {
+    expect(css).toContain('@keyframes shimmer');
+    expect(css).toContain('.animate-shimmer');
+  });
+
+  it('should define glow-pulse animation', () => {
+    expect(css).toContain('@keyframes glow-pulse');
+  });
+
+  it('should define glass morphism utility', () => {
+    expect(css).toContain('.glass');
+    expect(css).toContain('backdrop-filter: blur(16px)');
+    expect(css).toContain('saturate(1.2)');
+  });
+
+  it('should define text-gradient-accent utility', () => {
+    expect(css).toContain('.text-gradient-accent');
+    expect(css).toContain('background-clip: text');
+  });
+
+  it('should define noise-bg utility', () => {
+    expect(css).toContain('.noise-bg::before');
+    expect(css).toContain('feTurbulence');
+  });
+
   it('should include scrollbar styling', () => {
     expect(css).toContain('::-webkit-scrollbar');
     expect(css).toContain('--scrollbar-thumb');
+  });
+
+  it('should apply smooth transitions on interactive elements', () => {
+    expect(css).toContain('button, a, input, select, textarea');
+    expect(css).toContain('transition-duration: 180ms');
   });
 });

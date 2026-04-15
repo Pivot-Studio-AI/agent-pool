@@ -16,7 +16,7 @@ const source = readFileSync(
 
 describe('DiffReview layout structure', () => {
   it('renders MergeControls with border-b (top placement)', () => {
-    expect(source).toContain('border-b border-border pb-6');
+    expect(source).toContain('border-b border-border/50 pb-6');
     // The old bottom placement used border-t pt-6 — should be gone
     expect(source).not.toContain('border-t border-border pt-6');
   });

@@ -12,9 +12,25 @@ describe('Button component', () => {
     }
   });
 
+  it('should use gradient backgrounds for primary/success/merge variants', () => {
+    expect(source).toContain('bg-gradient-to-b from-accent to-accent/90');
+    expect(source).toContain('bg-gradient-to-b from-green to-green/90');
+    expect(source).toContain('bg-gradient-to-b from-purple to-purple/90');
+  });
+
+  it('should add ring-1 borders to primary/success/merge variants', () => {
+    expect(source).toContain('ring-1 ring-accent/30');
+    expect(source).toContain('ring-1 ring-green/30');
+    expect(source).toContain('ring-1 ring-purple/30');
+  });
+
+  it('should use shadow-inner-glow on default variant', () => {
+    expect(source).toContain('shadow-inner-glow');
+  });
+
   it('should support sm and md sizes', () => {
-    expect(source).toContain("sm:");
-    expect(source).toContain("md:");
+    expect(source).toContain('sm:');
+    expect(source).toContain('md:');
   });
 
   it('should disable button when loading or disabled', () => {

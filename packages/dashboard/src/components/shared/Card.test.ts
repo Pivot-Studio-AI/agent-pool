@@ -10,9 +10,18 @@ describe('Card component', () => {
     expect(source).toContain('shadow-card');
   });
 
-  it('should support hover prop for hover effects', () => {
+  it('should apply ring-1 ring-white/[0.03] for subtle border', () => {
+    expect(source).toContain('ring-1 ring-white/[0.03]');
+  });
+
+  it('should support hover prop with translate effect', () => {
     expect(source).toContain("hover?: boolean");
     expect(source).toContain('shadow-card-hover');
+    expect(source).toContain('hover:-translate-y-px');
+  });
+
+  it('should increase ring opacity on hover', () => {
+    expect(source).toContain('hover:ring-white/[0.06]');
   });
 
   it('should default hover to false', () => {

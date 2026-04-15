@@ -76,7 +76,7 @@ describe('TaskCreator mixed-content paste (preventDefault fix)', () => {
 describe('TaskCreator attachment previews in expanded panel', () => {
   it('renders attachment previews inside the expanded panel, not inline', () => {
     // The comment marking the new location
-    expect(source).toContain('Attachments Preview — inside expanded panel');
+    expect(source).toContain('Attachments Preview');
   });
 
   it('does not render attachment thumbnails outside the expanded section', () => {

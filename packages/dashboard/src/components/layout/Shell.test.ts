@@ -19,6 +19,16 @@ describe('Shell layout', () => {
     expect(source).toContain('<TaskInbox />');
   });
 
+  it('should have subtle gradient background blurs', () => {
+    expect(source).toContain('bg-accent/[0.02]');
+    expect(source).toContain('bg-purple/[0.02]');
+    expect(source).toContain('blur-[120px]');
+  });
+
+  it('should use pointer-events-none on background gradient layer', () => {
+    expect(source).toContain('pointer-events-none');
+  });
+
   it('should restore task from URL on mount using pathname match', () => {
     expect(source).toContain("window.location.pathname.match(/^\\/tasks\\/([a-f0-9-]+)/)");
   });
@@ -28,8 +38,7 @@ describe('Shell layout', () => {
     expect(source).toContain('handlePopState');
   });
 
-  it('should use ml-60 for main content offset matching sidebar width', () => {
-    expect(source).toContain('ml-60');
-    expect(source).toContain('pt-14');
+  it('should use ml-60 for main content offset with relative positioning', () => {
+    expect(source).toContain('ml-60 pt-14 min-h-screen relative');
   });
 });

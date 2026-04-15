@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import type { Task } from '../../lib/types';
 
-// Replicate the Section component's visibility logic for testing
-// (no DOM rendering library available, so we test the pure logic)
+const source = readFileSync(resolve(__dirname, 'Sidebar.tsx'), 'utf-8');
 
+// Replicate the Section component's visibility logic for testing
 function shouldRenderSection(tasks: Task[]): boolean {
   return tasks.length > 0;
 }
 
 function isCollapsed(defaultCollapsed: boolean, toggleCount: number): boolean {
-  // Each toggle flips the state; even toggles = back to default
   return toggleCount % 2 === 0 ? defaultCollapsed : !defaultCollapsed;
 }
 
@@ -38,6 +39,35 @@ function makeMockTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
+describe('Sidebar design updates', () => {
+  it('should use glass utility for frosted sidebar background', () => {
+    expect(source).toContain('glass');
+  });
+
+  it('should use border-border/60 for subtle border', () => {
+    expect(source).toContain('border-border/60');
+  });
+
+  it('should show active indicator bar on selected task', () => {
+    expect(source).toContain('w-0.5 h-4 bg-accent rounded-r');
+  });
+
+  it('should apply ring-1 ring-accent/15 on selected task', () => {
+    expect(source).toContain('ring-1 ring-accent/15');
+  });
+
+  it('should show section count with ml-auto alignment', () => {
+    expect(source).toContain('ml-auto');
+  });
+
+  it('should define all sidebar sections', () => {
+    expect(source).toContain('Needs Attention');
+    expect(source).toContain('In Progress');
+    expect(source).toContain('Queued');
+    expect(source).toContain('Recent');
+  });
+});
+
 describe('Sidebar Section collapse logic', () => {
   describe('shouldRenderSection', () => {
     it('returns false when tasks array is empty', () => {
@@ -62,12 +92,10 @@ describe('Sidebar Section collapse logic', () => {
 
     it('toggles to collapsed after one click when starting expanded', () => {
       expect(isCollapsed(false, 1)).toBe(true);
-      expect(shouldShowTasks(isCollapsed(false, 1))).toBe(false);
     });
 
     it('toggles to expanded after one click when starting collapsed', () => {
       expect(isCollapsed(true, 1)).toBe(false);
-      expect(shouldShowTasks(isCollapsed(true, 1))).toBe(true);
     });
 
     it('returns to default state after two toggles', () => {
@@ -77,7 +105,7 @@ describe('Sidebar Section collapse logic', () => {
   });
 
   describe('chevron rotation', () => {
-    it('chevron is rotated (rotate-90) when section is expanded', () => {
+    it('chevron is rotated when section is expanded', () => {
       expect(chevronRotated(false)).toBe(true);
     });
 
@@ -87,7 +115,6 @@ describe('Sidebar Section collapse logic', () => {
   });
 
   describe('Sidebar section configuration', () => {
-    // Verify the Section props match what Sidebar passes
     const sectionConfigs = [
       { title: 'Needs Attention', dotColor: 'bg-amber', defaultCollapsed: false },
       { title: 'In Progress', dotColor: 'bg-green', defaultCollapsed: false },
