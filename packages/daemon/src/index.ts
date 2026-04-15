@@ -476,7 +476,7 @@ async function runAgentLifecycle(
     const prompt = buildPlanPrompt(task, effectiveRepoPath);
 
     // 4. Run planning phase (may loop if plan is rejected, up to MAX_PLAN_RETRIES)
-    const MAX_PLAN_RETRIES = parseInt(process.env.MAX_PLAN_RETRIES || '3', 10);
+    const MAX_PLAN_RETRIES = parseInt(process.env.MAX_PLAN_RETRIES || '5', 10);
     let approved = false;
     let planFileManifest: string[] = [];
     let currentPlanPrompt = prompt;
