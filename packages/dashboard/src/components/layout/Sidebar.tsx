@@ -22,15 +22,12 @@ function TaskItem({
     <button
       onClick={onClick}
       className={clsx(
-        'w-full text-left px-3 py-2.5 rounded-lg text-sm group relative',
+        'w-full text-left px-3 py-2.5 text-sm group relative border-l-2',
         isSelected
-          ? 'bg-accent/10 shadow-glow-accent ring-1 ring-accent/15'
-          : 'hover:bg-surface-hover'
+          ? 'bg-accent/8 border-l-accent'
+          : 'border-l-transparent hover:bg-surface-hover hover:border-l-border'
       )}
     >
-      {isSelected && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r" />
-      )}
       <div className={clsx(
         'truncate text-xs font-medium',
         isSelected ? 'text-accent' : 'text-text-primary group-hover:text-accent'
@@ -63,14 +60,14 @@ function Section({
     <div className="mb-6">
       <div className="flex items-center gap-2 px-3 mb-2">
         {dotColor && (
-          <span className={clsx('w-1.5 h-1.5 rounded-full', dotColor)} />
+          <span className={clsx('w-1.5 h-1.5', dotColor)} />
         )}
         <span className="text-text-muted text-[10px] font-bold uppercase tracking-widest">
           {title}
         </span>
         <span className="text-text-muted/50 text-[10px] font-mono ml-auto">{tasks.length}</span>
       </div>
-      <div className="space-y-0.5 px-1.5">
+      <div className="space-y-px">
         {tasks.map((task) => (
           <TaskItem
             key={task.id}
@@ -94,7 +91,7 @@ export function Sidebar() {
   const recent = getRecentTasks(store);
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-60 glass border-r border-border/60 overflow-y-auto z-20">
+    <aside className="fixed left-0 top-14 bottom-0 w-64 bg-surface border-r border-border overflow-y-auto z-20">
       <div className="py-4">
         <Section
           title="Needs Attention"

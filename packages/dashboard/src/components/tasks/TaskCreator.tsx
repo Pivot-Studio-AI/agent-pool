@@ -158,12 +158,12 @@ export function TaskCreator() {
   };
 
   return (
-    <div className="flex-1 max-w-xl mx-3">
+    <div className="flex-1 max-w-2xl mx-3">
       <div className="relative">
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-text-muted hover:text-text-secondary p-0.5 rounded"
+            className="text-text-muted hover:text-text-secondary p-0.5"
             aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
           >
             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -182,8 +182,8 @@ export function TaskCreator() {
               onKeyDown={handleKeyDown}
               placeholder="Describe a task..."
               disabled={loading}
-              className={`w-full bg-bg/60 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-gray-400 focus:outline-none focus:border-accent/40 focus:bg-bg/80 disabled:opacity-50 ${
-                dragOver ? 'border-accent bg-accent/5' : 'border-border/60'
+              className={`w-full bg-bg border pl-3 pr-20 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent disabled:opacity-50 ${
+                dragOver ? 'border-accent bg-accent/5' : 'border-border'
               }`}
             />
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -191,7 +191,7 @@ export function TaskCreator() {
                 <button
                   type="button"
                   onClick={() => setExpanded(true)}
-                  className="flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md hover:bg-accent/20 ring-1 ring-accent/20"
+                  className="flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 hover:bg-accent/20 border border-accent/25"
                   title="View attached images"
                 >
                   <Image size={10} />
@@ -201,7 +201,7 @@ export function TaskCreator() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-text-muted hover:text-text-secondary p-1 rounded"
+                className="text-text-muted hover:text-text-secondary p-1"
                 title="Add image files"
               >
                 <Paperclip size={13} />
@@ -210,7 +210,7 @@ export function TaskCreator() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={!title.trim() || loading}
-                className="text-accent hover:text-accent/80 p-1 rounded disabled:opacity-30"
+                className="text-accent hover:text-accent/80 p-1 disabled:opacity-30"
                 title="Create task"
               >
                 <Send size={13} />
@@ -220,14 +220,14 @@ export function TaskCreator() {
         </div>
 
         {expanded && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border/60 rounded-xl p-4 space-y-3 z-50 shadow-elevated animate-fade-in ring-1 ring-white/[0.03]">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border p-4 space-y-3 z-50 shadow-2xl animate-fade-in">
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">Priority</label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40"
+                  className="w-full bg-bg border border-border px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -241,7 +241,7 @@ export function TaskCreator() {
                   type="text"
                   value={targetBranch}
                   onChange={(e) => setTargetBranch(e.target.value)}
-                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent/40"
+                  className="w-full bg-bg border border-border px-2 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent"
                 />
               </div>
               <div>
@@ -249,7 +249,7 @@ export function TaskCreator() {
                 <select
                   value={modelTier}
                   onChange={(e) => setModelTier(e.target.value)}
-                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40"
+                  className="w-full bg-bg border border-border px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent"
                 >
                   <option value="default">Default</option>
                   <option value="fast">Fast</option>
@@ -264,8 +264,8 @@ export function TaskCreator() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide more detail about the task..."
-                rows={3}
-                className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-gray-400 focus:outline-none focus:border-accent/40 resize-none"
+                rows={4}
+                className="w-full bg-bg border border-border px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
               />
             </div>
 
@@ -281,11 +281,11 @@ export function TaskCreator() {
                       <img
                         src={attachment.preview}
                         alt={attachment.file.name}
-                        className="w-14 h-14 object-cover rounded-lg border border-border/60 ring-1 ring-white/[0.03]"
+                        className="w-14 h-14 object-cover border border-border"
                       />
                       <button
                         onClick={() => removeAttachment(index)}
-                        className="absolute -top-1 -right-1 w-4 h-4 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100"
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red text-white flex items-center justify-center opacity-0 group-hover:opacity-100"
                         title="Remove image"
                       >
                         <X size={10} />

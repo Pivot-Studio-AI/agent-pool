@@ -162,7 +162,7 @@ export function PlanReview({ task }: PlanReviewProps) {
       </div>
 
       {/* Actions */}
-      <div className="border-b border-border/50 pb-6">
+      <div className="border-b border-border pb-6">
         <ApprovalControls
           taskId={task.id}
           planId={plan.id}
@@ -174,7 +174,7 @@ export function PlanReview({ task }: PlanReviewProps) {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red ring-1 ring-red/10">
+        <div className="bg-red/5 border border-red/25 px-4 py-2.5 text-sm text-red">
           {error}
         </div>
       )}
@@ -183,7 +183,7 @@ export function PlanReview({ task }: PlanReviewProps) {
       {previousRejections.length > 0 && (
         <div className="space-y-2">
           {previousRejections.map((p, i) => (
-            <div key={p.id} className="bg-red/5 border border-red/20 rounded-lg px-4 py-3 ring-1 ring-red/10">
+            <div key={p.id} className="bg-red/5 border border-red/25 px-4 py-3">
               <h3 className="text-[10px] font-bold text-red uppercase tracking-widest mb-1.5">
                 Plan {i + 1} Rejected
               </h3>

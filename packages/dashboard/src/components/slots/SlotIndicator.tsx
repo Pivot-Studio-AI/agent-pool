@@ -4,10 +4,10 @@ import type { SlotStatus } from '../../lib/types';
 
 const dotStyles: Record<SlotStatus, string> = {
   idle: 'bg-text-muted/20',
-  claimed: 'bg-green ring-1 ring-green/30',
-  active: 'bg-green ring-1 ring-green/30 animate-pulse-subtle',
-  cleaning: 'bg-amber ring-1 ring-amber/30',
-  quarantined: 'bg-red ring-1 ring-red/30',
+  claimed: 'bg-green border border-green/40',
+  active: 'bg-green border border-green/40 animate-pulse-subtle',
+  cleaning: 'bg-amber border border-amber/40',
+  quarantined: 'bg-red border border-red/40',
 };
 
 export function SlotIndicator() {
@@ -21,7 +21,7 @@ export function SlotIndicator() {
         <div
           key={slot.id}
           title={`Slot ${slot.slot_number}: ${slot.status}${slot.branch_name ? ` (${slot.branch_name})` : ''}`}
-          className={clsx('w-2 h-2 rounded-full', dotStyles[slot.status] ?? 'bg-text-muted/20')}
+          className={clsx('w-2 h-2', dotStyles[slot.status] ?? 'bg-text-muted/20')}
         />
       ))}
     </div>

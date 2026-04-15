@@ -98,20 +98,18 @@ function StatCard({
   label,
   value,
   valueColor,
-  glowColor,
-  iconBg,
+  accent,
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
   valueColor: string;
-  glowColor?: string;
-  iconBg?: string;
+  accent?: boolean;
 }) {
   return (
-    <Card className={glowColor}>
+    <Card>
       <div className="flex items-center gap-3">
-        <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${iconBg || 'bg-surface-hover'} ring-1 ring-white/[0.04]`}>
+        <div className={`flex items-center justify-center w-10 h-10 border ${accent ? 'border-accent/20 bg-accent/5' : 'border-border bg-surface-hover'}`}>
           <Icon size={16} className="text-text-muted" />
         </div>
         <div>
@@ -153,15 +151,13 @@ export function TaskInbox() {
           label="Needs Attention"
           value={attentionTasks.length}
           valueColor="text-amber"
-          glowColor={attentionTasks.length > 0 ? 'shadow-glow-amber' : undefined}
-          iconBg={attentionTasks.length > 0 ? 'bg-amber/8' : undefined}
+          accent={attentionTasks.length > 0}
         />
         <StatCard
           icon={Play}
           label="Building"
           value={activeTasks.length}
           valueColor="text-green"
-          iconBg={activeTasks.length > 0 ? 'bg-green/8' : undefined}
         />
         <StatCard icon={Clock} label="Slots Active" value={`${activeSlots}/${totalSlots}`} valueColor="text-text-primary" />
         <StatCard
@@ -169,7 +165,6 @@ export function TaskInbox() {
           label="Completed Today"
           value={completedToday}
           valueColor="text-green"
-          iconBg={completedToday > 0 ? 'bg-green/8' : undefined}
         />
       </div>
 
@@ -179,11 +174,11 @@ export function TaskInbox() {
           Needs Your Attention
         </h2>
         {attentionTasks.length === 0 ? (
-          <div className="text-text-muted text-sm py-8 text-center rounded-xl border border-dashed border-border">
+          <div className="text-text-muted text-sm py-8 text-center border border-dashed border-border">
             No tasks need your attention right now.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-px">
             {attentionTasks.map((task) => (
               <button
                 key={task.id}
@@ -198,7 +193,7 @@ export function TaskInbox() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
-                      <ArrowRight size={14} className="text-text-muted opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5" />
+                      <ArrowRight size={14} className="text-text-muted opacity-0 group-hover:opacity-100" />
                     </div>
                   </div>
                 </Card>
@@ -214,7 +209,7 @@ export function TaskInbox() {
           Recent Activity
         </h2>
         {recentEvents.length === 0 ? (
-          <div className="text-text-muted text-sm py-8 text-center rounded-xl border border-dashed border-border">No recent activity.</div>
+          <div className="text-text-muted text-sm py-8 text-center border border-dashed border-border">No recent activity.</div>
         ) : (
           <Card>
             <div className="divide-y divide-border/50">
@@ -225,7 +220,7 @@ export function TaskInbox() {
                   </span>
                   <span className="relative flex h-2 w-2 shrink-0">
                     <span
-                      className={`relative inline-flex rounded-full h-2 w-2 ${
+                      className={`relative inline-flex h-2 w-2 ${
                         EVENT_DOT_COLORS[event.event_type] || 'bg-text-muted'
                       }`}
                     />

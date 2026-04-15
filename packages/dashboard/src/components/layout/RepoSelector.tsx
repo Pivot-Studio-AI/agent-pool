@@ -54,7 +54,7 @@ export function RepoSelector() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-text-muted hover:text-text-secondary hover:bg-surface-hover transition-colors"
+        className="flex items-center gap-1.5 px-2 py-1 text-text-muted hover:text-text-secondary hover:bg-surface-hover"
         aria-label="Toggle repo selector"
       >
         <span className="text-sm truncate max-w-[200px]">
@@ -64,7 +64,7 @@ export function RepoSelector() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-1 w-80 bg-surface border border-border shadow-2xl z-50 overflow-hidden">
           {/* Search */}
           <div className="p-2 border-b border-border">
             <div className="relative">
@@ -75,7 +75,7 @@ export function RepoSelector() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search repos..."
                 autoFocus
-                className="w-full bg-bg border border-border rounded-lg pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all"
+                className="w-full bg-bg border border-border pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
               />
             </div>
           </div>
@@ -91,10 +91,10 @@ export function RepoSelector() {
                   <button
                     key={repo.id}
                     onClick={() => handleSelect(repo.github_full_name, repo.github_url, repo.default_branch)}
-                    className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 hover:bg-surface-hover flex items-center gap-2"
                   >
                     <div
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      className={`w-2 h-2 flex-shrink-0 ${
                         selectedRepo?.github_full_name === repo.github_full_name
                           ? 'bg-accent'
                           : 'bg-border'
@@ -116,11 +116,11 @@ export function RepoSelector() {
                   <button
                     key={repo.id}
                     onClick={() => handleSelect(repo.full_name, repo.html_url, repo.default_branch)}
-                    className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-surface-hover"
                   >
                     <div className="flex items-center gap-2">
                       <div
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        className={`w-2 h-2 flex-shrink-0 ${
                           selectedRepo?.github_full_name === repo.full_name
                             ? 'bg-accent'
                             : 'bg-border'
