@@ -83,7 +83,7 @@ daemonRouter.post('/repo/ack', async (req, res, next) => {
 daemonRouter.get('/repo', async (_req, res, next) => {
   try {
     const result = await query(
-      `SELECT * FROM repositories ORDER BY created_at DESC LIMIT 1`,
+      `SELECT *, id AS repo_id FROM repositories ORDER BY created_at DESC LIMIT 1`,
     );
 
     if (result.rows.length === 0) {
@@ -104,7 +104,7 @@ daemonRouter.get('/repo', async (_req, res, next) => {
 // ---------------------------------------------------------------------------
 daemonRouter.get('/repos', async (_req, res, next) => {
   try {
-    const result = await query('SELECT * FROM repositories ORDER BY created_at ASC');
+    const result = await query('SELECT *, id AS repo_id FROM repositories ORDER BY created_at ASC');
     res.json({ data: result.rows });
   } catch (err) {
     next(err);
