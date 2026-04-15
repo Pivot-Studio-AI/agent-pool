@@ -12,20 +12,19 @@ describe('Button component', () => {
     }
   });
 
-  it('should use gradient backgrounds for primary/success/merge variants', () => {
-    expect(source).toContain('bg-gradient-to-b from-accent to-accent/90');
-    expect(source).toContain('bg-gradient-to-b from-green to-green/90');
-    expect(source).toContain('bg-gradient-to-b from-purple to-purple/90');
+  it('should use flat bg colors instead of gradients for primary/success/merge', () => {
+    expect(source).toContain('bg-accent text-white');
+    expect(source).toContain('bg-green text-white');
+    expect(source).toContain('bg-purple text-white');
+    expect(source).not.toContain('bg-gradient-to-b');
   });
 
-  it('should add ring-1 borders to primary/success/merge variants', () => {
-    expect(source).toContain('ring-1 ring-accent/30');
-    expect(source).toContain('ring-1 ring-green/30');
-    expect(source).toContain('ring-1 ring-purple/30');
-  });
-
-  it('should use shadow-inner-glow on default variant', () => {
-    expect(source).toContain('shadow-inner-glow');
+  it('should use border instead of ring for variant borders', () => {
+    expect(source).toContain('border border-accent/50');
+    expect(source).toContain('border border-green/50');
+    expect(source).toContain('border border-purple/50');
+    expect(source).not.toContain('ring-1 ring-accent');
+    expect(source).not.toContain('shadow-inner-glow');
   });
 
   it('should support sm and md sizes', () => {
@@ -37,12 +36,8 @@ describe('Button component', () => {
     expect(source).toContain('disabled={disabled || loading}');
   });
 
-  it('should show a spinner when loading', () => {
-    expect(source).toContain('animate-spin');
-    expect(source).toContain('{loading && (');
-  });
-
-  it('should apply active:scale transform for press feedback', () => {
-    expect(source).toContain('active:scale-[0.97]');
+  it('should use active:opacity instead of active:scale for press feedback', () => {
+    expect(source).toContain('active:opacity-80');
+    expect(source).not.toContain('active:scale');
   });
 });

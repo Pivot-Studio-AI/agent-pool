@@ -26,9 +26,11 @@ describe('globals.css', () => {
     expect(css).toContain('--color-border-subtle');
   });
 
-  it('should define fade-in animation', () => {
+  it('should define fade-in and slide-in-right animations', () => {
     expect(css).toContain('@keyframes fade-in');
     expect(css).toContain('.animate-fade-in');
+    expect(css).toContain('@keyframes slide-in-right');
+    expect(css).toContain('.animate-slide-in');
   });
 
   it('should define pulse-subtle animation', () => {
@@ -36,38 +38,26 @@ describe('globals.css', () => {
     expect(css).toContain('.animate-pulse-subtle');
   });
 
-  it('should define shimmer animation', () => {
-    expect(css).toContain('@keyframes shimmer');
-    expect(css).toContain('.animate-shimmer');
+  it('should NOT define removed utilities (shimmer, glass, noise, gradient-text)', () => {
+    expect(css).not.toContain('@keyframes shimmer');
+    expect(css).not.toContain('.glass');
+    expect(css).not.toContain('.text-gradient-accent');
+    expect(css).not.toContain('.noise-bg');
+    expect(css).not.toContain('@keyframes glow-pulse');
   });
 
-  it('should define glow-pulse animation', () => {
-    expect(css).toContain('@keyframes glow-pulse');
+  it('should use outline for focus instead of box-shadow glow', () => {
+    expect(css).toContain('outline: 2px solid var(--color-accent)');
+    expect(css).not.toContain('box-shadow: 0 0 0 3px var(--color-accent-glow)');
   });
 
-  it('should define glass morphism utility', () => {
-    expect(css).toContain('.glass');
-    expect(css).toContain('backdrop-filter: blur(16px)');
-    expect(css).toContain('saturate(1.2)');
-  });
-
-  it('should define text-gradient-accent utility', () => {
-    expect(css).toContain('.text-gradient-accent');
-    expect(css).toContain('background-clip: text');
-  });
-
-  it('should define noise-bg utility', () => {
-    expect(css).toContain('.noise-bg::before');
-    expect(css).toContain('feTurbulence');
+  it('should use 120ms transition duration', () => {
+    expect(css).toContain('transition-duration: 120ms');
+    expect(css).not.toContain('transition-duration: 180ms');
   });
 
   it('should include scrollbar styling', () => {
     expect(css).toContain('::-webkit-scrollbar');
     expect(css).toContain('--scrollbar-thumb');
-  });
-
-  it('should apply smooth transitions on interactive elements', () => {
-    expect(css).toContain('button, a, input, select, textarea');
-    expect(css).toContain('transition-duration: 180ms');
   });
 });

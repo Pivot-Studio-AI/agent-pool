@@ -10,7 +10,6 @@ describe('Tailwind config', () => {
       'text-primary', 'text-secondary', 'text-muted', 'accent', 'accent-glow',
       'green', 'green-glow', 'amber', 'amber-glow', 'red', 'red-glow', 'purple', 'purple-glow'];
     for (const c of colors) {
-      // Keys may be unquoted (bg:) or quoted ('surface-hover':)
       const hasKey = source.includes(`${c}:`) || source.includes(`'${c}':`);
       expect(hasKey, `Expected color token '${c}' to exist`).toBe(true);
     }
@@ -21,20 +20,16 @@ describe('Tailwind config', () => {
     expect(source).toContain('JetBrains Mono');
   });
 
-  it('should define glow box shadows', () => {
-    expect(source).toContain('glow-accent');
-    expect(source).toContain('glow-green');
-    expect(source).toContain('glow-amber');
-    expect(source).toContain('glow-red');
-    expect(source).toContain('glow-purple');
+  it('should NOT define glow/shadow utilities (removed in flat redesign)', () => {
+    expect(source).not.toContain('glow-accent');
+    expect(source).not.toContain('glow-green');
+    expect(source).not.toContain('inner-glow');
+    expect(source).not.toContain('elevated');
+    expect(source).not.toContain('card-hover');
   });
 
-  it('should define inner-glow shadow', () => {
-    expect(source).toContain('inner-glow');
-  });
-
-  it('should define elevated shadow', () => {
-    expect(source).toContain('elevated');
+  it('should set borderRadius none to 0px for sharp edges', () => {
+    expect(source).toContain("'none': '0px'");
   });
 
   it('should support darkMode with class strategy', () => {

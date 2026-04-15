@@ -5,7 +5,7 @@ import { resolve } from 'path';
 const source = readFileSync(resolve(__dirname, 'Badge.tsx'), 'utf-8');
 
 describe('Badge component', () => {
-  it('should define a colorMap with all expected colors including ring property', () => {
+  it('should define a colorMap with all expected colors including border property', () => {
     const expectedColors = ['accent', 'green', 'amber', 'red', 'purple', 'text-muted', 'text-secondary'];
     for (const color of expectedColors) {
       const hasKey = source.includes(`${color}:`) || source.includes(`'${color}':`);
@@ -13,16 +13,19 @@ describe('Badge component', () => {
     }
   });
 
-  it('should include ring property in colorMap entries', () => {
-    expect(source).toContain('ring:');
-    expect(source).toContain('ring-accent/20');
-    expect(source).toContain('ring-green/20');
-    expect(source).toContain('ring-red/20');
+  it('should include border property in colorMap entries instead of ring', () => {
+    expect(source).toContain('border:');
+    expect(source).toContain('border-accent/25');
+    expect(source).toContain('border-green/25');
+    expect(source).toContain('border-red/25');
+    expect(source).not.toContain('ring:');
+    expect(source).not.toContain('ring-1');
   });
 
-  it('should apply ring-1 base class for subtle borders', () => {
-    expect(source).toContain('ring-1');
-    expect(source).toContain('mapped.ring');
+  it('should apply border base class instead of ring-1', () => {
+    expect(source).toContain("'inline-flex items-center px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase border'");
+    expect(source).toContain('mapped.border');
+    expect(source).not.toContain('mapped.ring');
   });
 
   it('should use text-[10px] font size and tracking-wider', () => {
@@ -32,10 +35,5 @@ describe('Badge component', () => {
 
   it('should fall back to text-secondary for unknown colors', () => {
     expect(source).toContain("colorMap['text-secondary']");
-  });
-
-  it('should use clsx for className composition', () => {
-    expect(source).toContain("import { clsx } from 'clsx'");
-    expect(source).toContain('clsx(');
   });
 });

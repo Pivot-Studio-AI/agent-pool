@@ -27,7 +27,7 @@ export function UserMenu() {
     return (
       <button
         onClick={login}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised active:scale-[0.97]"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised active:opacity-80"
       >
         <LogIn size={14} />
         Sign In
@@ -39,18 +39,18 @@ export function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen(!open)}
-        className="rounded-full hover:ring-2 hover:ring-accent/40 transition-all"
+        className="hover:opacity-80"
         aria-label="User menu"
       >
         <img
           src={user.github_avatar_url}
           alt={user.github_login}
-          className="w-7 h-7 rounded-full"
+          className="w-7 h-7"
         />
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-48 bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full right-0 mt-1 w-48 bg-surface border border-border shadow-2xl z-50 overflow-hidden">
           <div className="px-3 py-2 border-b border-border">
             <span className="text-sm text-text-primary font-medium">{user.github_login}</span>
           </div>
@@ -59,7 +59,7 @@ export function UserMenu() {
               setOpen(false);
               logout();
             }}
-            className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors flex items-center gap-2"
+            className="w-full text-left px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary flex items-center gap-2"
           >
             <LogOut size={14} />
             Sign Out

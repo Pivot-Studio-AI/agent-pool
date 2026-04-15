@@ -11,11 +11,11 @@ interface ButtonProps {
 }
 
 const variantStyles: Record<string, string> = {
-  primary: 'bg-gradient-to-b from-accent to-accent/90 text-white hover:brightness-110 shadow-glow-accent ring-1 ring-accent/30',
-  success: 'bg-gradient-to-b from-green to-green/90 text-white hover:brightness-110 shadow-glow-green ring-1 ring-green/30',
-  danger: 'border border-red/30 text-red hover:bg-red/8 hover:border-red/50 ring-1 ring-transparent hover:ring-red/10',
-  merge: 'bg-gradient-to-b from-purple to-purple/90 text-white hover:brightness-110 shadow-glow-purple ring-1 ring-purple/30',
-  default: 'bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised shadow-inner-glow',
+  primary: 'bg-accent text-white hover:bg-accent/85 border border-accent/50',
+  success: 'bg-green text-white hover:bg-green/85 border border-green/50',
+  danger: 'border border-red/40 text-red hover:bg-red/8 hover:border-red/60',
+  merge: 'bg-purple text-white hover:bg-purple/85 border border-purple/50',
+  default: 'bg-surface-hover border border-border text-text-primary hover:border-text-muted/40 hover:bg-surface-raised',
 };
 
 const sizeStyles: Record<string, string> = {
@@ -37,9 +37,9 @@ export function Button({
       onClick={onClick}
       disabled={disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium',
-        'disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none',
-        'active:scale-[0.97]',
+        'inline-flex items-center justify-center gap-1.5 font-medium',
+        'disabled:opacity-40 disabled:cursor-not-allowed',
+        'active:opacity-80',
         variantStyles[variant],
         sizeStyles[size],
         className

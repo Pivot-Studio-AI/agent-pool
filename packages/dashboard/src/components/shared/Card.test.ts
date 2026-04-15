@@ -5,23 +5,18 @@ import { resolve } from 'path';
 const source = readFileSync(resolve(__dirname, 'Card.tsx'), 'utf-8');
 
 describe('Card component', () => {
-  it('should use rounded-xl and shadow-card by default', () => {
-    expect(source).toContain('rounded-xl');
-    expect(source).toContain('shadow-card');
+  it('should use border instead of shadow-card and ring', () => {
+    expect(source).toContain('bg-surface border border-border p-5');
+    expect(source).not.toContain('shadow-card');
+    expect(source).not.toContain('ring-1');
+    expect(source).not.toContain('rounded-xl');
   });
 
-  it('should apply ring-1 ring-white/[0.03] for subtle border', () => {
-    expect(source).toContain('ring-1 ring-white/[0.03]');
-  });
-
-  it('should support hover prop with translate effect', () => {
+  it('should support hover prop with bg change instead of translate', () => {
     expect(source).toContain("hover?: boolean");
-    expect(source).toContain('shadow-card-hover');
-    expect(source).toContain('hover:-translate-y-px');
-  });
-
-  it('should increase ring opacity on hover', () => {
-    expect(source).toContain('hover:ring-white/[0.06]');
+    expect(source).toContain('hover:bg-surface-hover');
+    expect(source).toContain('hover:border-text-muted/30');
+    expect(source).not.toContain('hover:-translate-y-px');
   });
 
   it('should default hover to false', () => {

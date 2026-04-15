@@ -13,7 +13,7 @@ export function Toasts() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="bg-surface border border-border rounded-lg p-3 shadow-lg cursor-pointer hover:border-accent/50 transition-colors"
+          className="bg-surface border border-border p-3 cursor-pointer hover:border-accent/50 animate-fade-in"
           onClick={() => {
             if (toast.taskId) {
               selectTask(toast.taskId);
