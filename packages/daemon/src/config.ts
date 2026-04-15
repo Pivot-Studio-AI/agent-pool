@@ -19,6 +19,7 @@ const configSchema = z.object({
   defaultBranch: z.string().default('main'),
   integrationBranch: z.string().optional(),
   spawnMode: z.enum(['headless', 'tmux']).default('headless'),
+  appUrl: z.string().url().optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -38,6 +39,7 @@ function loadConfig(): Config {
     defaultBranch: process.env.DEFAULT_BRANCH || undefined,
     integrationBranch: process.env.INTEGRATION_BRANCH || undefined,
     spawnMode: (process.env.SPAWN_MODE as 'headless' | 'tmux') || undefined,
+    appUrl: process.env.APP_URL || undefined,
   };
 
   const result = configSchema.safeParse(raw);

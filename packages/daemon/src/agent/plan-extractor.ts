@@ -1,40 +1,49 @@
 export interface ExtractedPlan {
-  content: string;
+  content: string;       // Full plan document (all sections)
   fileManifest: string[];
   reasoning: string;
   estimate: string;
+  whatFound: string;     // ## What I Found section
+  notInScope: string;    // ## NOT in Scope section
 }
 
 /**
  * Extract a structured plan from the agent's output text.
  *
  * Looks for these markdown headers:
- * - "## Plan" — content until next ## header
- * - "## Files to Modify" — parse bullet list as file paths
- * - "## Reasoning" — content until next ## header
- * - "## Estimate" — content until next ## header or end
+ * - "## What I Found" — exploration findings (new)
+ * - "## Plan"         — approach summary
+ * - "## Files to Modify" — file manifest
+ * - "## NOT in Scope" — explicit exclusions (new)
+ * - "## Reasoning"    — rationale
+ * - "## Estimate"     — scope estimate
  *
  * Returns null if "## Plan" header is not found.
  */
 export function extractPlan(agentText: string): ExtractedPlan | null {
-  // Check if the plan header exists (case-insensitive, flexible formatting)
   if (findHeader(agentText, 'plan') === -1) {
     return null;
   }
 
-  const content = extractSection(agentText, 'plan');
+  // Full content = everything from the first ## header through end (all sections for display)
+  const firstHeader = agentText.match(/^#{2,3}\s/m);
+  const fullContent = firstHeader?.index !== undefined
+    ? agentText.slice(firstHeader.index).trim()
+    : agentText.trim();
+
   const filesSection = extractSection(agentText, 'files to modify') || extractSection(agentText, 'files');
   const reasoning = extractSection(agentText, 'reasoning');
   const estimate = extractSection(agentText, 'estimate');
-
-  // Parse file manifest from bullet list
-  const fileManifest = parseFileManifest(filesSection);
+  const whatFound = extractSection(agentText, 'what i found') || extractSection(agentText, 'what i found');
+  const notInScope = extractSection(agentText, 'not in scope');
 
   return {
-    content: content.trim(),
-    fileManifest,
+    content: fullContent,
+    fileManifest: parseFileManifest(filesSection),
     reasoning: reasoning.trim(),
     estimate: estimate.trim(),
+    whatFound: whatFound.trim(),
+    notInScope: notInScope.trim(),
   };
 }
 
@@ -43,7 +52,6 @@ export function extractPlan(agentText: string): ExtractedPlan | null {
  * Returns the index of the header or -1 if not found.
  */
 function findHeader(text: string, headerName: string): number {
-  // Match: ## Plan, ## **Plan**, ##Plan, ## PLAN, etc.
   const regex = new RegExp(
     `^#{2,3}\\s*\\**\\s*${headerName}\\s*\\**\\s*$`,
     'im'
@@ -61,7 +69,6 @@ function extractSection(text: string, headerName: string): string {
     return '';
   }
 
-  // Find end of header line
   const afterHeaderStart = text.slice(headerIndex);
   const lineBreakIndex = afterHeaderStart.indexOf('\n');
   if (lineBreakIndex === -1) {
@@ -69,8 +76,6 @@ function extractSection(text: string, headerName: string): string {
   }
 
   const contentStart = afterHeaderStart.slice(lineBreakIndex + 1);
-
-  // Find the next ## header
   const nextHeaderMatch = contentStart.match(/^#{2,3}\s/m);
   if (nextHeaderMatch && nextHeaderMatch.index !== undefined) {
     return contentStart.slice(0, nextHeaderMatch.index);
@@ -93,19 +98,15 @@ function parseFileManifest(section: string): string[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match lines starting with - or * followed by content
     const match = trimmed.match(/^[-*]\s+(.+)$/);
     if (match) {
       let filePath = match[1].trim();
 
-      // If path is wrapped in backticks, extract just the backtick content
       const backtickMatch = filePath.match(/^`([^`]+)`/);
       if (backtickMatch) {
         filePath = backtickMatch[1];
       } else {
-        // Remove surrounding quotes
         filePath = filePath.replace(/^[`"']|[`"']$/g, '');
-        // Split on em-dash or parenthetical ONLY (not regular hyphens which appear in filenames)
         const descSplit = filePath.split(/\s+[—]\s+|\s+\(/);
         filePath = descSplit[0].trim();
       }

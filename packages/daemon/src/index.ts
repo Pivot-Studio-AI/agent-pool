@@ -22,6 +22,8 @@ import { ensureRepo } from './git/clone.js';
 import { createCheckpoint, cleanupCheckpoints } from './git/checkpoint.js';
 import { readWorkspaceConfig, runSetup, runTeardown } from './worktree/lifecycle.js';
 import { writeAgentStatus, broadcast } from './worktree/status.js';
+import { takeScreenshot } from './screenshot.js';
+import { spawn } from 'child_process';
 
 // ---- Deploy Status Helper ----
 
@@ -463,13 +465,28 @@ async function runAgentLifecycle(
     };
     updateStatus('planning');
 
+    // 4. Pre-screenshot (best-effort, requires APP_URL)
+    let screenshotPath: string | undefined;
+    if (config.appUrl) {
+      const captured = await takeScreenshot(
+        config.appUrl,
+        path.join(worktreePath, 'context'),
+        'screenshot.png'
+      );
+      if (captured) {
+        screenshotPath = './context/screenshot.png';
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Pre-screenshot captured`);
+      }
+    }
+
     // 4. Build the plan prompt
-    const prompt = buildPlanPrompt(task, effectiveRepoPath);
+    const prompt = buildPlanPrompt(task, effectiveRepoPath, screenshotPath);
 
     // 4. Run planning phase (may loop if plan is rejected, up to MAX_PLAN_RETRIES)
     const MAX_PLAN_RETRIES = parseInt(process.env.MAX_PLAN_RETRIES || '5', 10);
     let approved = false;
     let planFileManifest: string[] = [];
+    let approvedPlanContent = '';
     let currentPlanPrompt = prompt;
 
     for (let planAttempt = 1; planAttempt <= MAX_PLAN_RETRIES && !shuttingDown; planAttempt++) {
@@ -487,9 +504,22 @@ async function runAgentLifecycle(
         throw new Error('Agent exited without producing a plan');
       }
 
+      // Run adversarial review (best-effort, non-blocking quality gate)
+      let planContentForSubmit = planResult.content;
+      try {
+        console.log(`[lifecycle:${taskId.slice(0, 8)}] Running adversarial review...`);
+        const reviewText = await runAdversarialReview(planResult.content, task.title);
+        if (reviewText) {
+          planContentForSubmit = `${planResult.content}\n\n---\n${reviewText}`;
+          console.log(`[lifecycle:${taskId.slice(0, 8)}] Adversarial review appended`);
+        }
+      } catch {
+        // Non-fatal — proceed without review
+      }
+
       // Submit plan to server
       const plan = await api.submitPlan(taskId, {
-        content: planResult.content,
+        content: planContentForSubmit,
         file_manifest: planResult.fileManifest,
         reasoning: planResult.reasoning,
         estimate: planResult.estimate,
@@ -505,6 +535,7 @@ async function runAgentLifecycle(
       if (decision.status === 'approved') {
         approved = true;
         planFileManifest = planResult.fileManifest;
+        approvedPlanContent = planResult.content;
         console.log(`[lifecycle:${taskId.slice(0, 8)}] Plan approved!`);
         break;
       } else if (decision.status === 'rejected') {
@@ -557,7 +588,7 @@ async function runAgentLifecycle(
     }
     updateStatus('executing', planFileManifest);
     broadcast(worktreePath, `slot-${slotNumber}`, `Executing: ${task.title} — files: ${planFileManifest.join(', ')}`);
-    await runExecutionAgent(taskId, worktreePath, task, agentEntry, planFileManifest, taskModel, effectiveRepoPath);
+    await runExecutionAgent(taskId, worktreePath, task, agentEntry, planFileManifest, taskModel, effectiveRepoPath, approvedPlanContent);
 
     if (shuttingDown) return;
 
@@ -1002,10 +1033,11 @@ function runExecutionAgent(
   agentEntry: ActiveAgent,
   planFileManifest: string[],
   model?: string,
-  repoPath?: string
+  repoPath?: string,
+  planContent?: string
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const executionPrompt = buildExecutionPrompt(task, planFileManifest, repoPath);
+    const executionPrompt = buildExecutionPrompt(task, planFileManifest, repoPath, planContent);
     const { process: proc, kill } = spawnAgent(
       worktreePath,
       executionPrompt,
@@ -1126,152 +1158,211 @@ function runChangesAgent(
 
 // ---- Prompt Builders ----
 
-function buildPlanPrompt(task: api.Task, repoPath?: string): string {
-  const effectiveRepoPath = repoPath ?? config.repoPath!;
-  let claudeMdContent = '';
-  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    try {
-      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
-    } catch {
-      // Ignore read errors
-    }
+function readClaudeMd(repoPath: string): string {
+  try {
+    const p = path.join(repoPath, 'CLAUDE.md');
+    return fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : '';
+  } catch {
+    return '';
   }
+}
 
-  const claudeMdSection = claudeMdContent
-    ? `\n${claudeMdContent}\n`
+function buildPlanPrompt(task: api.Task, repoPath?: string, screenshotPath?: string): string {
+  const effectiveRepoPath = repoPath ?? config.repoPath!;
+  const claudeMd = readClaudeMd(effectiveRepoPath);
+  const claudeMdSection = claudeMd ? `\n${claudeMd}\n` : '';
+
+  const screenshotSection = screenshotPath
+    ? `\n📸 A screenshot of the current app is saved at: ${screenshotPath}\nUse the Read tool to view it during Phase 1.\n`
     : '';
 
-  return `You are an AI coding agent working on a task. Your working directory is a git worktree.
+  return `You are an AI coding agent. Do NOT write any code yet — you are in the PLANNING phase.
 
-TASK: ${task.title}
-DESCRIPTION: ${task.description}
-${claudeMdSection}
-INSTRUCTIONS:
-1. First, analyze the codebase and generate a PLAN. Output your plan using this exact format:
+TASK: ${task.title}${task.description ? `\nDESCRIPTION: ${task.description}` : ''}
+${claudeMdSection}${screenshotSection}
+════════════════════════════════════════════════
+PHASE 1 — EXPLORE (complete this before writing any plan)
+════════════════════════════════════════════════
+
+Explore the codebase before planning. Take as many turns as needed:
+
+1. Use Glob to find relevant files (components, pages, styles, services, etc.)
+2. Read the 3–5 most relevant files — understand existing patterns, design system, naming
+3. Use Grep to find where relevant functionality lives
+4. If a screenshot is provided above, Read it to understand the current visual state
+5. Check recent commits: git log --oneline -10
+
+Your goal: have a genuine understanding of what code already exists and which specific files need to change.
+
+════════════════════════════════════════════════
+PHASE 2 — PLAN (only after Phase 1 is complete)
+════════════════════════════════════════════════
+
+Output your plan using EXACTLY this format. No code, no implementation — just the plan:
+
+## What I Found
+[Specific files, components, patterns you discovered. Include file paths and line numbers. No vague statements.]
 
 ## Plan
-[Your approach summary]
+[Your approach. Reference actual files/code you read — not generic descriptions.]
 
 ## Files to Modify
-- path/to/file1.ts
-- path/to/file2.ts
+- path/to/file.tsx
+- path/to/other.css
+
+## NOT in Scope
+[What you will NOT touch, even if it seems related. Be explicit.]
 
 ## Reasoning
-[Why this approach]
+[Why this approach, grounded in what you found]
 
 ## Estimate
-[Number of files, approximate lines]
+[Number of files, approximate scope]
 
-2. STOP after outputting the plan. Do not write any code yet. Wait for approval.`;
+STOP after the plan. Do not write any code. Wait for approval.`;
 }
 
 function buildRejectionPrompt(task: api.Task, feedback: string, repoPath?: string): string {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
-  let claudeMdContent = '';
-  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    try {
-      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
-    } catch {
-      // Ignore read errors
-    }
-  }
+  const claudeMd = readClaudeMd(effectiveRepoPath);
+  const claudeMdSection = claudeMd ? `\n${claudeMd}\n` : '';
 
-  const claudeMdSection = claudeMdContent
-    ? `\n${claudeMdContent}\n`
-    : '';
+  return `You are an AI coding agent. Do NOT write any code — you are revising a plan.
 
-  return `You are an AI coding agent working on a task. Your working directory is a git worktree.
-
-TASK: ${task.title}
-DESCRIPTION: ${task.description}
+TASK: ${task.title}${task.description ? `\nDESCRIPTION: ${task.description}` : ''}
 ${claudeMdSection}
-PREVIOUS PLAN REJECTED. Feedback: ${feedback}
+PREVIOUS PLAN REJECTED. Reviewer feedback:
+${feedback}
 
-INSTRUCTIONS:
-Generate a revised plan incorporating the feedback. Use this exact format:
+Re-explore the codebase as needed to address the feedback, then generate a revised plan using EXACTLY this format:
+
+## What I Found
+[What you discovered that's relevant to the feedback]
 
 ## Plan
-[Your approach summary]
+[Revised approach incorporating the feedback]
 
 ## Files to Modify
-- path/to/file1.ts
-- path/to/file2.ts
+- path/to/file.tsx
+
+## NOT in Scope
+[What you will NOT touch]
 
 ## Reasoning
-[Why this approach]
+[Why this revised approach addresses the feedback]
 
 ## Estimate
-[Number of files, approximate lines]
+[Number of files, approximate scope]
 
-STOP after outputting the plan. Do not write any code yet. Wait for approval.`;
+STOP after the plan. Do not write any code. Wait for approval.`;
 }
 
-function buildExecutionPrompt(task: api.Task, planFileManifest: string[], repoPath?: string): string {
+function buildExecutionPrompt(task: api.Task, planFileManifest: string[], repoPath?: string, planContent?: string): string {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
-  let claudeMdContent = '';
-  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    try {
-      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
-    } catch {
-      // Ignore read errors
-    }
-  }
+  const claudeMd = readClaudeMd(effectiveRepoPath);
+  const claudeMdSection = claudeMd ? `\n${claudeMd}\n` : '';
 
-  const claudeMdSection = claudeMdContent
-    ? `\n${claudeMdContent}\n`
+  const planSection = planContent
+    ? `\nAPPROVED PLAN (your blueprint — implement exactly this):\n${planContent}\n`
     : '';
 
   const fileListSection = planFileManifest.length > 0
-    ? `\nAPPROVED FILE MANIFEST (ONLY modify these files):\n${planFileManifest.map(f => `- ${f}`).join('\n')}\n`
+    ? `\nAPPROVED FILE MANIFEST — only modify these files:\n${planFileManifest.map(f => `- ${f}`).join('\n')}\n`
     : '';
 
-  return `You are an AI coding agent working on a task. Your working directory is a git worktree.
+  return `You are an AI coding agent. The plan has been approved — implement it now.
 
-TASK: ${task.title}
-DESCRIPTION: ${task.description}
-${claudeMdSection}
-PLAN APPROVED. Proceed with implementation.
-${fileListSection}
-REQUIREMENTS:
-1. Implement ALL changes described in the approved plan. Do not skip any planned files.
-2. ONLY modify files listed in the approved file manifest. Do NOT touch any other files, even if you think they need changes. If a file is not in the manifest, leave it alone.
-3. Do NOT revert, "clean up", or modify existing code that is unrelated to your task. The codebase may contain recent changes from other developers — do not touch them.
-4. Commit your changes when done with a clear commit message.
+TASK: ${task.title}${task.description ? `\nDESCRIPTION: ${task.description}` : ''}
+${claudeMdSection}${planSection}${fileListSection}
+SCOPE DISCIPLINE — read carefully:
+- ONLY modify files in the approved manifest above
+- Every change must serve the task description — nothing more
+- Do NOT "clean up", refactor, or improve code outside the task scope
+- Do NOT touch files that are not in the manifest, even if they seem related
+- Before committing: verify all changed files are in the manifest
+  Run: git diff --name-only HEAD~1..HEAD (if you've committed) or git diff --name-only
 
-Focus on clean, correct implementation. Tests will be handled separately by QA.`;
+IMPLEMENTATION REQUIREMENTS:
+1. Implement ALL changes from the approved plan — do not skip planned files
+2. Follow existing patterns and conventions you see in the codebase
+3. Commit your changes when done with a clear, descriptive commit message
+
+Focus on correct implementation that matches the plan exactly.`;
 }
 
 function buildChangesPrompt(task: api.Task, feedback: string, repoPath?: string): string {
   const effectiveRepoPath = repoPath ?? config.repoPath!;
-  let claudeMdContent = '';
-  const claudeMdPath = path.join(effectiveRepoPath, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    try {
-      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8');
-    } catch {
-      // Ignore read errors
-    }
-  }
+  const claudeMd = readClaudeMd(effectiveRepoPath);
+  const claudeMdSection = claudeMd ? `\n${claudeMd}\n` : '';
 
-  const claudeMdSection = claudeMdContent
-    ? `\n${claudeMdContent}\n`
-    : '';
+  return `You are an AI coding agent. The reviewer has requested changes.
 
-  return `You are an AI coding agent working on a task. Your working directory is a git worktree.
-
-TASK: ${task.title}
-DESCRIPTION: ${task.description}
+TASK: ${task.title}${task.description ? `\nDESCRIPTION: ${task.description}` : ''}
 ${claudeMdSection}
-CHANGES REQUESTED. The reviewer has provided the following feedback on your code:
-
+CHANGES REQUESTED:
 ${feedback}
 
 REQUIREMENTS:
-1. Make the requested changes. Focus specifically on what the reviewer asked for.
-2. Commit your changes when done.`;
+1. Address the reviewer's feedback precisely — focus only on what was asked
+2. Do NOT make other changes beyond what the reviewer requested
+3. Commit your changes when done.`;
+}
+
+// ---- Adversarial Plan Review ----
+
+function runAdversarialReview(planContent: string, taskTitle: string): Promise<string> {
+  return new Promise((resolve) => {
+    const prompt = `You are a critical code reviewer. A coding agent has produced the following plan.
+
+TASK: ${taskTitle}
+
+PLAN:
+${planContent}
+
+In 3–5 bullet points, identify the most important concerns:
+- Files likely missing from the manifest that will need changes
+- Risky assumptions about the codebase
+- Scope that is too broad (will cause drift) or too narrow (will miss things)
+- A clearly better approach, if one exists
+
+Be direct and concise. Only flag real concerns — skip nitpicks.
+Format as:
+
+## Adversarial Review
+- [concern 1]
+- [concern 2]
+...
+
+If the plan looks solid, say so briefly.`;
+
+    const proc = spawn(
+      'claude',
+      [
+        '--dangerously-skip-permissions',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--max-turns', '3',
+        '-p', prompt,
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env } }
+    );
+
+    const parser = new OutputParser(proc.stdout!);
+    const timeout = setTimeout(() => {
+      proc.kill();
+      resolve('');
+    }, 45_000);
+
+    proc.on('exit', () => {
+      clearTimeout(timeout);
+      resolve(parser.getCollectedText().trim());
+    });
+
+    proc.on('error', () => {
+      clearTimeout(timeout);
+      resolve('');
+    });
+  });
 }
 
 // ---- Code Audit ----
