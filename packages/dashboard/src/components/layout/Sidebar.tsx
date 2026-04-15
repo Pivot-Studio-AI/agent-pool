@@ -38,7 +38,7 @@ function TaskItem({
         {task.title}
       </div>
       <div className="mt-1.5">
-        <TaskStatusBadge status={task.status} />
+        <TaskStatusBadge status={task.status} taskId={task.id} />
       </div>
     </button>
   );

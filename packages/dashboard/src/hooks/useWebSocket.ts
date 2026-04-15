@@ -11,6 +11,7 @@ export function useWebSocket() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const updateTask = useTaskStore((s) => s.updateTaskInStore);
+  const setTestStatus = useTaskStore((s) => s.setTestStatus);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const updateSlot = useSlotStore((s) => s.updateSlotInStore);
   const prependEvent = useEventStore((s) => s.prependEvent);
@@ -25,6 +26,14 @@ export function useWebSocket() {
         case 'task.updated': {
           if (data) {
             updateTask(data);
+
+            // When a task moves to awaiting_review, tests start running automatically
+            if (data.status === 'awaiting_review') {
+              const prevTestStatus = useTaskStore.getState().testStatus[data.id];
+              if (!prevTestStatus) {
+                setTestStatus(data.id, 'running');
+              }
+            }
 
             // Show toast for attention-needing tasks not currently viewed
             if (
@@ -50,6 +59,10 @@ export function useWebSocket() {
         case 'diffs.tests_updated': {
           // Test results updated — update the task in store to trigger DiffReview re-render
           if (data?.task_id) {
+            // Track test status for sidebar categorization
+            if (data.test_results?.status) {
+              setTestStatus(data.task_id, data.test_results.status);
+            }
             // Force the task's updated_at to change so components re-fetch diffs
             const tasks = useTaskStore.getState().tasks;
             const task = tasks[data.task_id];

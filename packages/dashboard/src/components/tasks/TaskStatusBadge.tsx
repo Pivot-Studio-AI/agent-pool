@@ -1,9 +1,12 @@
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { Badge } from '../shared/Badge';
+import { useTaskStore } from '../../stores/task-store';
+import { isTestsRunning } from '../../stores/task-store';
 import type { TaskStatus } from '../../lib/types';
 
 interface TaskStatusBadgeProps {
   status: TaskStatus;
+  taskId?: string;
   deployStatus?: string | null;
   className?: string;
 }
@@ -29,8 +32,15 @@ function DeployIcon({ deployStatus }: { deployStatus: string }) {
   return null;
 }
 
-export function TaskStatusBadge({ status, deployStatus, className }: TaskStatusBadgeProps) {
-  const config = statusConfig[status] ?? { color: 'text-muted', label: status };
+export function TaskStatusBadge({ status, taskId, deployStatus, className }: TaskStatusBadgeProps) {
+  const store = useTaskStore();
+  const testsRunning = taskId ? isTestsRunning(store, taskId) : false;
+
+  let config = statusConfig[status] ?? { color: 'text-muted', label: status };
+  if (status === 'awaiting_review' && testsRunning) {
+    config = { color: 'accent', label: 'Tests Running' };
+  }
+
   return (
     <span className="inline-flex items-center gap-1.5">
       <Badge color={config.color} className={className}>

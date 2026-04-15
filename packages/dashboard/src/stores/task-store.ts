@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
 import { useAuthStore } from './auth-store';
-import type { Task } from '../lib/types';
+import type { Task, Diff } from '../lib/types';
 
 interface TaskState {
   tasks: Record<string, Task>;
+  testStatus: Record<string, string>;
   selectedTaskId: string | null;
   loading: boolean;
   fetchTasks: () => Promise<void>;
@@ -18,10 +19,12 @@ interface TaskState {
   }) => Promise<Task>;
   selectTask: (id: string | null) => void;
   updateTaskInStore: (task: Task) => void;
+  setTestStatus: (taskId: string, status: string) => void;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: {},
+  testStatus: {},
   selectedTaskId: null,
   loading: false,
 
@@ -39,6 +42,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         record[task.id] = task;
       }
       set({ tasks: record, loading: false });
+
+      // Fetch test status for awaiting_review tasks
+      const awaitingReview = tasks.filter((t) => t.status === 'awaiting_review');
+      for (const task of awaitingReview) {
+        api.get<Diff[]>(`/tasks/${task.id}/diffs`).then((diffs) => {
+          const latest = diffs[diffs.length - 1];
+          if (latest?.test_results?.status) {
+            get().setTestStatus(task.id, latest.test_results.status);
+          }
+        }).catch(() => {});
+      }
     } catch {
       set({ loading: false });
     }
@@ -96,18 +110,35 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       tasks: { ...state.tasks, [task.id]: task },
     }));
   },
+
+  setTestStatus: (taskId, status) => {
+    set((state) => ({
+      testStatus: { ...state.testStatus, [taskId]: status },
+    }));
+  },
 }));
 
 // Selector helpers
+export function isTestsRunning(state: TaskState, taskId: string): boolean {
+  return state.testStatus[taskId] === 'running';
+}
+
 export function getAttentionTasks(state: TaskState): Task[] {
   return Object.values(state.tasks).filter(
-    (t) => t.status === 'awaiting_approval' || t.status === 'awaiting_review'
+    (t) =>
+      t.status === 'awaiting_approval' ||
+      (t.status === 'awaiting_review' && !isTestsRunning(state, t.id))
   );
 }
 
 export function getActiveTasks(state: TaskState): Task[] {
   return Object.values(state.tasks).filter(
-    (t) => t.status === 'executing' || t.status === 'planning' || t.status === 'merging' || t.status === 'deploying'
+    (t) =>
+      t.status === 'executing' ||
+      t.status === 'planning' ||
+      t.status === 'merging' ||
+      t.status === 'deploying' ||
+      (t.status === 'awaiting_review' && isTestsRunning(state, t.id))
   );
 }
 
