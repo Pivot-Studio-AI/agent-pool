@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
-import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw } from 'lucide-react';
+import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw, ExternalLink, Rocket } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
 import { Badge } from '../shared/Badge';
@@ -238,7 +238,60 @@ function DeployingView({ task }: { task: Task }) {
       label="Deploying to production..."
       labelColor="text-purple"
       subtitle="Monitoring GitHub Actions deploy"
+      extra={
+        task.deploy_url ? (
+          <a
+            href={task.deploy_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-accent text-xs hover:underline"
+          >
+            View deployment <ExternalLink size={12} />
+          </a>
+        ) : null
+      }
     />
+  );
+}
+
+function DeployStatusIndicator({ task }: { task: Task }) {
+  if (!task.deploy_status) return null;
+
+  const icon =
+    task.deploy_status === 'success' ? <CheckCircle size={14} className="text-green" /> :
+    task.deploy_status === 'failed' ? <XCircle size={14} className="text-red" /> :
+    task.deploy_status === 'pending' ? <Loader size={14} className="text-amber animate-spin" /> :
+    <Rocket size={14} className="text-text-muted" />;
+
+  const label =
+    task.deploy_status === 'success' ? 'Deployed' :
+    task.deploy_status === 'failed' ? 'Deploy Failed' :
+    task.deploy_status === 'pending' ? 'Deploying...' :
+    task.deploy_status;
+
+  const color =
+    task.deploy_status === 'success' ? 'text-green' :
+    task.deploy_status === 'failed' ? 'text-red' :
+    task.deploy_status === 'pending' ? 'text-amber' :
+    'text-text-muted';
+
+  return (
+    <div className="flex items-center gap-3 bg-surface rounded-lg px-4 py-3 ring-1 ring-white/[0.04]">
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className={`text-sm font-medium ${color}`}>{label}</span>
+      </div>
+      {task.deploy_url && (
+        <a
+          href={task.deploy_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-accent text-xs hover:underline ml-auto"
+        >
+          View deployment <ExternalLink size={12} />
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -338,6 +391,9 @@ function CompletedView({ task }: { task: Task }) {
           )}
         </div>
       </Card>
+
+      {/* Deploy status */}
+      <DeployStatusIndicator task={task} />
 
       {/* Error details */}
       {errorDetails && (

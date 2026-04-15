@@ -9,6 +9,7 @@ import {
   updateTask,
   deleteTask,
   createTaskWithAttachments,
+  updateTaskDeploy,
 } from '../services/task-service.js';
 import { updateTestResults } from '../services/diff-service.js';
 
@@ -173,6 +174,22 @@ taskRouter.post('/:id/test-results', async (req, res, next) => {
   try {
     await updateTestResults(req.params.id, req.body);
     res.json({ data: { updated: true } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /tasks/:id/deploy — Update deploy status on a task
+// ---------------------------------------------------------------------------
+taskRouter.patch('/:id/deploy', async (req, res, next) => {
+  try {
+    const { deploy_status, deploy_url } = req.body;
+    if (!deploy_status) {
+      return res.status(400).json({ error: { message: 'deploy_status is required', code: 'VALIDATION_ERROR' } });
+    }
+    const task = await updateTaskDeploy(req.params.id, deploy_status, deploy_url);
+    res.json({ data: task });
   } catch (err) {
     next(err);
   }

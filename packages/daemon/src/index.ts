@@ -23,6 +23,32 @@ import { createCheckpoint, cleanupCheckpoints } from './git/checkpoint.js';
 import { readWorkspaceConfig, runSetup, runTeardown } from './worktree/lifecycle.js';
 import { writeAgentStatus, broadcast } from './worktree/status.js';
 
+// ---- Deploy Status Helper ----
+
+/**
+ * Update deploy tracking fields on a task via the server API.
+ * This wraps the PATCH /tasks/:id/deploy endpoint.
+ */
+async function updateTaskDeployStatus(taskId: string, deployStatus: string, deployUrl?: string): Promise<void> {
+  try {
+    const url = `${config.serverUrl}/api/v1/tasks/${taskId}/deploy`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ deploy_status: deployStatus, deploy_url: deployUrl }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.warn(`[deploy:${taskId.slice(0, 8)}] Failed to update deploy status: HTTP ${res.status} ${text}`);
+    }
+  } catch (err) {
+    console.warn(`[deploy:${taskId.slice(0, 8)}] Failed to update deploy status:`, err instanceof Error ? err.message : err);
+  }
+}
+
 // ---- Model Routing ----
 
 const MODEL_MAP: Record<string, string> = {
@@ -796,14 +822,18 @@ async function runAgentLifecycle(
           } catch {
             // deploying transition may fail — still complete the task
           }
+          // Set deploy_status to pending
+          try { await updateTaskDeployStatus(taskId, 'pending'); } catch {}
           console.log(`[lifecycle:${taskId.slice(0, 8)}] Pushed. Monitoring deploy...`);
 
           try {
-            const deploySuccess = await waitForDeploy(taskId);
-            if (deploySuccess) {
+            const deployResult = await waitForDeploy(taskId);
+            if (deployResult.success) {
+              await updateTaskDeployStatus(taskId, 'success', deployResult.url);
               await api.updateTaskStatus(taskId, 'completed');
               console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed — deployed!`);
             } else {
+              await updateTaskDeployStatus(taskId, 'failed', deployResult.url);
               // Push succeeded even if deploy fails — mark completed with note
               try { await api.updateTaskStatus(taskId, 'completed'); } catch {
                 await api.updateTaskStatus(taskId, 'errored', 'GitHub Actions deploy failed');
@@ -812,6 +842,7 @@ async function runAgentLifecycle(
             }
           } catch (deployErr) {
             const msg = deployErr instanceof Error ? deployErr.message : String(deployErr);
+            try { await updateTaskDeployStatus(taskId, 'failed'); } catch {}
             // Push succeeded — try to mark completed anyway
             try { await api.updateTaskStatus(taskId, 'completed'); } catch {
               await api.updateTaskStatus(taskId, 'errored', msg);
@@ -1546,7 +1577,12 @@ function checkPlanCompliance(
 
 // ---- Deploy Monitor ----
 
-async function waitForDeploy(taskId: string): Promise<boolean> {
+interface DeployResult {
+  success: boolean;
+  url?: string;
+}
+
+async function waitForDeploy(taskId: string): Promise<DeployResult> {
   const { execFileSync } = await import('child_process');
   const DEPLOY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
   const POLL_INTERVAL = 10_000; // 10 seconds
@@ -1558,14 +1594,14 @@ async function waitForDeploy(taskId: string): Promise<boolean> {
   while (Date.now() - start < DEPLOY_TIMEOUT) {
     try {
       const output = execFileSync(
-        'gh', ['api', 'repos/Pivot-Studio-AI/agent-pool/actions/runs', '--jq', '.workflow_runs[0] | {status, conclusion}'],
+        'gh', ['api', 'repos/Pivot-Studio-AI/agent-pool/actions/runs', '--jq', '.workflow_runs[0] | {status, conclusion, html_url}'],
         { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 }
       ).trim();
 
       const run = JSON.parse(output);
       if (run.status === 'completed') {
         console.log(`[deploy:${taskId.slice(0, 8)}] GitHub Actions: ${run.conclusion}`);
-        return run.conclusion === 'success';
+        return { success: run.conclusion === 'success', url: run.html_url || undefined };
       }
       console.log(`[deploy:${taskId.slice(0, 8)}] GitHub Actions: ${run.status}... (${Math.round((Date.now() - start) / 1000)}s)`);
     } catch (err) {

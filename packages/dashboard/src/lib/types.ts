@@ -23,6 +23,8 @@ export interface Task {
   target_branch: string;
   parent_task_id: string | null;
   attachments?: TaskAttachment[];
+  deploy_status?: string | null;
+  deploy_url?: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

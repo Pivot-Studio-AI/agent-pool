@@ -1,8 +1,10 @@
+import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import { Badge } from '../shared/Badge';
 import type { TaskStatus } from '../../lib/types';
 
 interface TaskStatusBadgeProps {
   status: TaskStatus;
+  deployStatus?: string | null;
   className?: string;
 }
 
@@ -20,11 +22,21 @@ const statusConfig: Record<TaskStatus, { color: string; label: string }> = {
   cancelled: { color: 'text-muted', label: 'Cancelled' },
 };
 
-export function TaskStatusBadge({ status, className }: TaskStatusBadgeProps) {
+function DeployIcon({ deployStatus }: { deployStatus: string }) {
+  if (deployStatus === 'success') return <CheckCircle size={10} className="text-green" />;
+  if (deployStatus === 'failed') return <XCircle size={10} className="text-red" />;
+  if (deployStatus === 'pending') return <Loader size={10} className="text-amber animate-spin" />;
+  return null;
+}
+
+export function TaskStatusBadge({ status, deployStatus, className }: TaskStatusBadgeProps) {
   const config = statusConfig[status] ?? { color: 'text-muted', label: status };
   return (
-    <Badge color={config.color} className={className}>
-      {config.label}
-    </Badge>
+    <span className="inline-flex items-center gap-1.5">
+      <Badge color={config.color} className={className}>
+        {config.label}
+      </Badge>
+      {deployStatus && <DeployIcon deployStatus={deployStatus} />}
+    </span>
   );
 }

@@ -31,6 +31,8 @@ export interface TaskRow {
   target_branch: string;
   parent_task_id: string | null;
   attachments?: TaskAttachmentRow[];
+  deploy_status: string | null;
+  deploy_url: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -424,4 +426,30 @@ export async function deleteTask(id: string): Promise<void> {
   await query('DELETE FROM tasks WHERE id = $1', [id]);
 
   broadcast('tasks', 'task.updated', { id, deleted: true });
+}
+
+/**
+ * Update deploy tracking fields on a task.
+ */
+export async function updateTaskDeploy(
+  id: string,
+  deployStatus: string,
+  deployUrl?: string | null,
+): Promise<TaskRow> {
+  const result = await query<TaskRow>(
+    `UPDATE tasks
+     SET deploy_status = $1,
+         deploy_url = COALESCE($2, deploy_url)
+     WHERE id = $3
+     RETURNING *`,
+    [deployStatus, deployUrl ?? null, id],
+  );
+
+  const updated = result.rows[0];
+  if (!updated) {
+    throw new Error(`Task not found: ${id}`);
+  }
+
+  broadcast('tasks', 'task.updated', updated);
+  return updated;
 }

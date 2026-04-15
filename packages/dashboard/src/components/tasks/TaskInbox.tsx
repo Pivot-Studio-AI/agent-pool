@@ -1,10 +1,24 @@
-import { AlertTriangle, Play, Clock, CheckCircle, ArrowRight } from 'lucide-react';
+import { AlertTriangle, Play, Clock, CheckCircle, ArrowRight, XCircle, Loader, Rocket } from 'lucide-react';
 import { Card } from '../shared/Card';
 import { TaskStatusBadge } from './TaskStatusBadge';
 import { useTaskStore, getAttentionTasks, getActiveTasks } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
 import { useSlotStore } from '../../stores/slot-store';
-import type { AppEvent } from '../../lib/types';
+import type { AppEvent, Task } from '../../lib/types';
+
+function DeployBadge({ task }: { task: Task }) {
+  if (!task.deploy_status) return null;
+  if (task.deploy_status === 'success') {
+    return <span aria-label="Deploy succeeded"><Rocket size={12} className="text-green" /></span>;
+  }
+  if (task.deploy_status === 'failed') {
+    return <span aria-label="Deploy failed"><XCircle size={12} className="text-red" /></span>;
+  }
+  if (task.deploy_status === 'pending') {
+    return <span aria-label="Deploying..."><Loader size={12} className="text-amber animate-spin" /></span>;
+  }
+  return null;
+}
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -180,7 +194,7 @@ export function TaskInbox() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-text-primary font-medium text-sm group-hover:text-accent">{task.title}</span>
-                      <TaskStatusBadge status={task.status} />
+                      <TaskStatusBadge status={task.status} deployStatus={task.deploy_status} />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
