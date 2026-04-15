@@ -182,8 +182,8 @@ export function TaskCreator() {
               onKeyDown={handleKeyDown}
               placeholder="Describe a task..."
               disabled={loading}
-              className={`w-full bg-bg/80 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-accent/50 disabled:opacity-50 ${
-                dragOver ? 'border-accent bg-accent/5' : 'border-border'
+              className={`w-full bg-bg/60 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:bg-bg/80 disabled:opacity-50 ${
+                dragOver ? 'border-accent bg-accent/5' : 'border-border/60'
               }`}
             />
             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -191,7 +191,7 @@ export function TaskCreator() {
                 <button
                   type="button"
                   onClick={() => setExpanded(true)}
-                  className="flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md hover:bg-accent/20"
+                  className="flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md hover:bg-accent/20 ring-1 ring-accent/20"
                   title="View attached images"
                 >
                   <Image size={10} />
@@ -220,14 +220,14 @@ export function TaskCreator() {
         </div>
 
         {expanded && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-xl p-4 space-y-3 z-50 shadow-card-hover animate-fade-in">
+          <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border/60 rounded-xl p-4 space-y-3 z-50 shadow-elevated animate-fade-in ring-1 ring-white/[0.03]">
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Priority</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">Priority</label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
+                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -236,20 +236,20 @@ export function TaskCreator() {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Target Branch</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">Target Branch</label>
                 <input
                   type="text"
                   value={targetBranch}
                   onChange={(e) => setTargetBranch(e.target.value)}
-                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent/50"
+                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent/40"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Model Tier</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">Model Tier</label>
                 <select
                   value={modelTier}
                   onChange={(e) => setModelTier(e.target.value)}
-                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
+                  className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40"
                 >
                   <option value="default">Default</option>
                   <option value="fast">Fast</option>
@@ -259,20 +259,20 @@ export function TaskCreator() {
             </div>
 
             <div>
-              <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Description</label>
+              <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide more detail about the task..."
                 rows={3}
-                className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-accent/50 resize-none"
+                className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 resize-none"
               />
             </div>
 
             {/* Attachments Preview */}
             {attachments.length > 0 && (
               <div>
-                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1.5">
                   Attachments ({attachments.length})
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -281,7 +281,7 @@ export function TaskCreator() {
                       <img
                         src={attachment.preview}
                         alt={attachment.file.name}
-                        className="w-14 h-14 object-cover rounded-lg border border-border"
+                        className="w-14 h-14 object-cover rounded-lg border border-border/60 ring-1 ring-white/[0.03]"
                       />
                       <button
                         onClick={() => removeAttachment(index)}

@@ -12,10 +12,10 @@ const darkThemeOverrides = `
     font-family: 'JetBrains Mono', monospace;
   }
   .d2h-file-header {
-    background-color: var(--color-surface);
+    background: linear-gradient(180deg, var(--color-surface-raised) 0%, var(--color-surface) 100%);
     border-color: var(--color-border);
     color: var(--color-text-primary);
-    padding: 8px 12px;
+    padding: 10px 14px;
   }
   .d2h-file-name {
     color: var(--color-text-primary);
@@ -23,14 +23,15 @@ const darkThemeOverrides = `
   }
   .d2h-file-wrapper {
     border-color: var(--color-border);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
   .d2h-diff-table {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
   }
   .d2h-code-line,
   .d2h-code-side-line {
@@ -41,29 +42,31 @@ const darkThemeOverrides = `
     color: var(--color-text-primary);
   }
   .d2h-del {
-    background-color: rgba(248, 113, 113, 0.08);
-    border-color: rgba(248, 113, 113, 0.2);
+    background-color: rgba(248, 113, 113, 0.06);
+    border-color: rgba(248, 113, 113, 0.15);
   }
   .d2h-del .d2h-code-line-ctn {
     color: var(--color-text-primary);
   }
   .d2h-del del {
-    background-color: rgba(248, 113, 113, 0.3);
+    background-color: rgba(248, 113, 113, 0.25);
     color: var(--color-text-primary);
+    border-radius: 2px;
   }
   .d2h-ins {
-    background-color: rgba(52, 211, 153, 0.08);
-    border-color: rgba(52, 211, 153, 0.2);
+    background-color: rgba(52, 211, 153, 0.06);
+    border-color: rgba(52, 211, 153, 0.15);
   }
   .d2h-ins .d2h-code-line-ctn {
     color: var(--color-text-primary);
   }
   .d2h-ins ins {
-    background-color: rgba(52, 211, 153, 0.3);
+    background-color: rgba(52, 211, 153, 0.25);
     color: var(--color-text-primary);
+    border-radius: 2px;
   }
   .d2h-info {
-    background-color: rgba(108, 140, 255, 0.06);
+    background-color: rgba(108, 140, 255, 0.04);
     border-color: var(--color-border);
     color: var(--color-text-muted);
     font-size: 11px;
@@ -81,7 +84,7 @@ const darkThemeOverrides = `
   }
   .d2h-file-diff .d2h-del.d2h-change,
   .d2h-file-diff .d2h-ins.d2h-change {
-    background-color: rgba(251, 191, 36, 0.08);
+    background-color: rgba(251, 191, 36, 0.06);
   }
   .d2h-tag {
     background-color: var(--color-surface);
@@ -115,7 +118,7 @@ export function DiffViewer({ diffContent, viewMode }: DiffViewerProps) {
     <div className="diff-viewer-container">
       <style>{darkThemeOverrides}</style>
       <div
-        className="overflow-auto rounded-xl shadow-card"
+        className="overflow-auto rounded-xl shadow-card ring-1 ring-white/[0.03]"
         dangerouslySetInnerHTML={{ __html: diffHtml }}
       />
     </div>

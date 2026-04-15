@@ -41,10 +41,16 @@ export function Shell({ isConnected }: ShellProps) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary">
+    <div className="min-h-screen bg-bg text-text-primary relative">
+      {/* Subtle gradient background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/[0.02] rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple/[0.02] rounded-full blur-[120px]" />
+      </div>
+
       <Header isConnected={isConnected} />
       <Sidebar />
-      <main className="ml-60 pt-14 min-h-screen">
+      <main className="ml-60 pt-14 min-h-screen relative">
         {selectedTaskId ? (
           <TaskDetail />
         ) : (

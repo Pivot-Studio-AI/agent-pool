@@ -141,8 +141,10 @@ function StatusView({
         <TaskMetadata task={task} />
       </div>
       <Card>
-        <div className="flex flex-col items-center gap-3 py-6">
-          {icon}
+        <div className="flex flex-col items-center gap-4 py-8">
+          <div className="p-3 rounded-2xl bg-surface-hover ring-1 ring-white/[0.04]">
+            {icon}
+          </div>
           <div className={`${labelColor} font-semibold text-sm`}>{label}</div>
           {subtitle && <div className="text-text-muted text-xs font-mono">{subtitle}</div>}
           {extra}
@@ -166,13 +168,13 @@ function ExecutingView({ task }: { task: Task }) {
   return (
     <StatusView
       task={task}
-      icon={<Loader className="text-green animate-spin" size={28} />}
+      icon={<Loader className="text-green animate-spin" size={24} />}
       label="Agent is building..."
       labelColor="text-green"
       subtitle={`Elapsed: ${elapsed(task.created_at)}`}
       extra={
         latestProgress ? (
-          <div className="text-text-secondary text-xs text-center mt-1 px-6 max-w-md">
+          <div className="text-text-secondary text-xs text-center mt-1 px-6 max-w-md bg-surface-hover/50 rounded-lg py-2">
             {latestProgress.payload?.message || 'Working...'}
           </div>
         ) : null
@@ -195,7 +197,7 @@ function QueuedView({ task }: { task: Task }) {
   return (
     <StatusView
       task={task}
-      icon={<Clock className="text-text-muted" size={28} />}
+      icon={<Clock className="text-text-muted" size={24} />}
       label="Waiting in Queue"
       labelColor="text-text-secondary"
       subtitle={`Position #${queuePosition}`}
@@ -207,7 +209,7 @@ function PlanningView({ task }: { task: Task }) {
   return (
     <StatusView
       task={task}
-      icon={<Loader className="text-accent animate-spin" size={28} />}
+      icon={<Loader className="text-accent animate-spin" size={24} />}
       label="Agent is analyzing..."
       labelColor="text-accent"
       subtitle="Generating a plan for this task"
@@ -219,7 +221,7 @@ function MergingView({ task }: { task: Task }) {
   return (
     <StatusView
       task={task}
-      icon={<Loader className="text-purple animate-spin" size={28} />}
+      icon={<Loader className="text-purple animate-spin" size={24} />}
       label="Merging..."
       labelColor="text-purple"
       subtitle={`Merging changes into ${task.target_branch}`}
@@ -231,7 +233,7 @@ function DeployingView({ task }: { task: Task }) {
   return (
     <StatusView
       task={task}
-      icon={<Loader className="text-purple animate-spin" size={28} />}
+      icon={<Loader className="text-purple animate-spin" size={24} />}
       label="Deploying to production..."
       labelColor="text-purple"
       subtitle="Monitoring GitHub Actions deploy"
@@ -251,13 +253,13 @@ function CompletedView({ task }: { task: Task }) {
 
   const icon =
     task.status === 'completed' ? (
-      <CheckCircle className="text-green" size={28} />
+      <CheckCircle className="text-green" size={24} />
     ) : task.status === 'errored' ? (
-      <XCircle className="text-red" size={28} />
+      <XCircle className="text-red" size={24} />
     ) : task.status === 'cancelled' ? (
-      <Ban className="text-text-muted" size={28} />
+      <Ban className="text-text-muted" size={24} />
     ) : (
-      <AlertTriangle className="text-red" size={28} />
+      <AlertTriangle className="text-red" size={24} />
     );
 
   const label =
@@ -283,7 +285,7 @@ function CompletedView({ task }: { task: Task }) {
       subtitle={task.completed_at ? `Finished ${timeAgo(task.completed_at)}` : undefined}
       extra={
         errorReason ? (
-          <div className="text-red text-xs mt-1 px-6 max-w-lg text-center break-words bg-red/5 rounded-lg p-3">
+          <div className="text-red text-xs mt-2 px-6 max-w-lg text-center break-words bg-red/5 rounded-lg p-3 ring-1 ring-red/10">
             {errorReason}
           </div>
         ) : null

@@ -112,7 +112,7 @@ export function DiffReview({ task }: DiffReviewProps) {
 
   if (loading) {
     return (
-      <div className="p-6 text-text-muted text-sm">Loading diff...</div>
+      <div className="p-6 text-text-muted text-sm animate-pulse-subtle">Loading diff...</div>
     );
   }
 
@@ -143,10 +143,10 @@ export function DiffReview({ task }: DiffReviewProps) {
   })();
 
   return (
-    <div className="p-6 space-y-5 overflow-auto animate-fade-in">
+    <div className="p-6 space-y-6 overflow-auto animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-bold text-text-primary mb-2">{task.title}</h1>
+        <h1 className="text-xl font-bold text-text-primary mb-3">{task.title}</h1>
         <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
           <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
             {task.priority}
@@ -166,7 +166,7 @@ export function DiffReview({ task }: DiffReviewProps) {
       </div>
 
       {/* Actions */}
-      <div className="border-b border-border pb-5">
+      <div className="border-b border-border/50 pb-6">
         <MergeControls
           taskId={task.id}
           onMerge={handleMerge}
@@ -179,27 +179,23 @@ export function DiffReview({ task }: DiffReviewProps) {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red">
+        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red ring-1 ring-red/10">
           {error}
         </div>
       )}
 
       {/* Stats Row */}
-      <div className="flex items-center gap-4 text-sm">
+      <div className="flex items-center gap-5 text-sm">
         <span className="text-text-secondary">
-          <span className="font-mono font-bold">{filesChanged.length}</span> file{filesChanged.length !== 1 ? 's' : ''} changed
+          <span className="font-mono font-bold text-text-primary">{filesChanged.length}</span> file{filesChanged.length !== 1 ? 's' : ''} changed
         </span>
         <span className="text-green font-mono font-bold">+{totalAdditions}</span>
         <span className="text-red font-mono font-bold">-{totalDeletions}</span>
         {compliance && !compliance.compliant && (
-          <span className="text-amber text-xs flex items-center gap-1">
-            Plan drift detected
-          </span>
+          <Badge color="amber">Plan drift</Badge>
         )}
         {compliance && compliance.compliant && (
-          <span className="text-green text-xs flex items-center gap-1">
-            Matches plan
-          </span>
+          <Badge color="green">Matches plan</Badge>
         )}
       </div>
 
@@ -213,16 +209,16 @@ export function DiffReview({ task }: DiffReviewProps) {
 
       {/* Compliance Warning */}
       {compliance && !compliance.compliant && (
-        <div className="bg-amber/5 border border-amber/20 rounded-lg px-4 py-3 text-sm">
-          <div className="font-semibold text-amber text-xs mb-1">Plan Compliance Drift</div>
+        <div className="bg-amber/5 border border-amber/20 rounded-lg px-4 py-3 text-sm ring-1 ring-amber/10">
+          <div className="font-semibold text-amber text-xs mb-1.5">Plan Compliance Drift</div>
           {compliance.unexpected.length > 0 && (
             <div className="text-text-secondary text-xs">
-              Unexpected files: <span className="font-mono">{compliance.unexpected.join(', ')}</span>
+              Unexpected files: <span className="font-mono text-text-muted">{compliance.unexpected.join(', ')}</span>
             </div>
           )}
           {compliance.missing.length > 0 && (
             <div className="text-text-secondary text-xs">
-              Missing from plan: <span className="font-mono">{compliance.missing.join(', ')}</span>
+              Missing from plan: <span className="font-mono text-text-muted">{compliance.missing.join(', ')}</span>
             </div>
           )}
         </div>
@@ -233,10 +229,10 @@ export function DiffReview({ task }: DiffReviewProps) {
         <Card>
           <div className="flex items-center gap-3 mb-3">
             <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Code Audit</div>
-            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-              diff.audit?.verdict === 'pass' ? 'bg-green/15 text-green' :
-              diff.audit?.verdict === 'fail' ? 'bg-red/15 text-red' :
-              'bg-amber/15 text-amber'
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ring-1 ${
+              diff.audit?.verdict === 'pass' ? 'bg-green/10 text-green ring-green/20' :
+              diff.audit?.verdict === 'fail' ? 'bg-red/10 text-red ring-red/20' :
+              'bg-amber/10 text-amber ring-amber/20'
             }`}>
               {(diff.audit.verdict ?? 'unknown').toUpperCase()}
             </span>
@@ -285,23 +281,23 @@ export function DiffReview({ task }: DiffReviewProps) {
           <div className="flex items-center gap-3 mb-2">
             <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Tests</div>
             {diff.test_results.status === 'running' && (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-accent/15 text-accent">
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-accent/10 text-accent ring-1 ring-accent/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-subtle" />
                 Running...
               </span>
             )}
             {diff.test_results.status === 'passed' && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-green/15 text-green">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-green/10 text-green ring-1 ring-green/20">
                 {diff.test_results.tests_passed ?? 0}/{diff.test_results.tests_written ?? 0} PASSED
               </span>
             )}
             {diff.test_results.status === 'failed' && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-red/15 text-red">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-red/10 text-red ring-1 ring-red/20">
                 {diff.test_results.tests_failed ?? 0} FAILED
               </span>
             )}
             {diff.test_results.status === 'skipped' && (
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-text-muted/15 text-text-muted">
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-text-muted/10 text-text-muted ring-1 ring-text-muted/10">
                 SKIPPED
               </span>
             )}
@@ -322,7 +318,7 @@ export function DiffReview({ task }: DiffReviewProps) {
       )}
 
       {/* File Tree + Diff */}
-      <div className="grid grid-cols-[220px_1fr] gap-4">
+      <div className="grid grid-cols-[240px_1fr] gap-4">
         {/* File tree sidebar */}
         <Card>
           <FileTree files={filesChanged} onFileClick={handleFileClick} />
@@ -331,12 +327,12 @@ export function DiffReview({ task }: DiffReviewProps) {
         {/* Diff content */}
         <div className="space-y-3">
           {/* View mode toggle */}
-          <div className="flex items-center gap-1 bg-surface rounded-lg p-0.5 w-fit shadow-card">
+          <div className="flex items-center gap-0.5 bg-surface rounded-lg p-0.5 w-fit shadow-card ring-1 ring-white/[0.03]">
             <button
               onClick={() => setViewMode('side-by-side')}
-              className={`px-3 py-1 text-xs rounded-md font-medium ${
+              className={`px-3 py-1.5 text-xs rounded-md font-medium ${
                 viewMode === 'side-by-side'
-                  ? 'bg-accent/15 text-accent'
+                  ? 'bg-accent/10 text-accent ring-1 ring-accent/20'
                   : 'text-text-muted hover:text-text-secondary'
               }`}
             >
@@ -344,9 +340,9 @@ export function DiffReview({ task }: DiffReviewProps) {
             </button>
             <button
               onClick={() => setViewMode('line-by-line')}
-              className={`px-3 py-1 text-xs rounded-md font-medium ${
+              className={`px-3 py-1.5 text-xs rounded-md font-medium ${
                 viewMode === 'line-by-line'
-                  ? 'bg-accent/15 text-accent'
+                  ? 'bg-accent/10 text-accent ring-1 ring-accent/20'
                   : 'text-text-muted hover:text-text-secondary'
               }`}
             >

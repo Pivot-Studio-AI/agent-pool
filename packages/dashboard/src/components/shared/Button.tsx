@@ -11,11 +11,11 @@ interface ButtonProps {
 }
 
 const variantStyles: Record<string, string> = {
-  primary: 'bg-accent text-white hover:brightness-110 shadow-glow-accent',
-  success: 'bg-green text-white hover:brightness-110 shadow-glow-green',
-  danger: 'border border-red/40 text-red hover:bg-red/10 hover:border-red/60',
-  merge: 'bg-purple text-white hover:brightness-110 shadow-glow-purple',
-  default: 'bg-surface-hover border border-border text-text-primary hover:border-text-muted/30',
+  primary: 'bg-gradient-to-b from-accent to-accent/90 text-white hover:brightness-110 shadow-glow-accent ring-1 ring-accent/30',
+  success: 'bg-gradient-to-b from-green to-green/90 text-white hover:brightness-110 shadow-glow-green ring-1 ring-green/30',
+  danger: 'border border-red/30 text-red hover:bg-red/8 hover:border-red/50 ring-1 ring-transparent hover:ring-red/10',
+  merge: 'bg-gradient-to-b from-purple to-purple/90 text-white hover:brightness-110 shadow-glow-purple ring-1 ring-purple/30',
+  default: 'bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised shadow-inner-glow',
 };
 
 const sizeStyles: Record<string, string> = {

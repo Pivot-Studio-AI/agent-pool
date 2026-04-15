@@ -82,15 +82,15 @@ export function ActivityFeed() {
 
   return (
     <div className="p-6 flex flex-col h-full max-w-4xl animate-fade-in">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider">Activity Feed</h2>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xs font-bold text-text-muted uppercase tracking-widest">Activity Feed</h2>
 
         <div className="flex items-center gap-2">
           {/* Event type filter */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-bg border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
+            className="bg-surface border border-border/60 rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40 ring-1 ring-white/[0.03]"
           >
             <option value="all">All Events</option>
             {ALL_EVENT_TYPES.map((type) => (
@@ -104,7 +104,7 @@ export function ActivityFeed() {
           <select
             value={taskFilter}
             onChange={(e) => setTaskFilter(e.target.value)}
-            className="bg-bg border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50 max-w-[200px]"
+            className="bg-surface border border-border/60 rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/40 max-w-[200px] ring-1 ring-white/[0.03]"
           >
             <option value="all">All Tasks</option>
             {taskOptions.map((t) => (
@@ -121,7 +121,7 @@ export function ActivityFeed() {
         className="flex-1 overflow-auto space-y-0.5"
       >
         {filteredEvents.length === 0 && !loading ? (
-          <div className="text-text-muted text-sm py-12 text-center">
+          <div className="text-text-muted text-sm py-12 text-center rounded-xl border border-dashed border-border">
             No events to show.
           </div>
         ) : (
@@ -130,7 +130,7 @@ export function ActivityFeed() {
           ))
         )}
         {loading && (
-          <div className="text-text-muted text-xs py-4 text-center">
+          <div className="text-text-muted text-xs py-4 text-center animate-pulse-subtle">
             Loading...
           </div>
         )}

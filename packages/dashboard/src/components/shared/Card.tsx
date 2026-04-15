@@ -9,8 +9,8 @@ interface CardProps {
 export function Card({ children, className, hover = false }: CardProps) {
   return (
     <div className={clsx(
-      'bg-surface rounded-xl p-5 shadow-card',
-      hover && 'hover:shadow-card-hover hover:border-text-muted/20',
+      'bg-surface rounded-xl p-5 shadow-card ring-1 ring-white/[0.03]',
+      hover && 'hover:shadow-card-hover hover:ring-white/[0.06] hover:-translate-y-px',
       className
     )}>
       {children}

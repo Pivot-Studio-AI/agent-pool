@@ -74,15 +74,15 @@ export function EventItem({ event }: EventItemProps) {
   const detail = event.payload?.message || event.payload?.title || '';
 
   return (
-    <div className="flex items-start gap-3 py-2 px-2 rounded hover:bg-surface/50 transition-colors">
-      <span className="text-text-muted text-xs w-16 shrink-0 pt-0.5 tabular-nums">
+    <div className="flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-hover/40 group">
+      <span className="text-text-muted text-[11px] w-16 shrink-0 pt-0.5 tabular-nums font-mono">
         {timeAgo(event.created_at)}
       </span>
-      <span
-        className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${dotColor}`}
-      />
+      <span className="relative flex h-2 w-2 shrink-0 mt-1.5">
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${dotColor}`} />
+      </span>
       <div className="min-w-0">
-        <span className="text-text-secondary text-sm">{description}</span>
+        <span className="text-text-secondary text-sm group-hover:text-text-primary">{description}</span>
         {detail && (
           <span className="text-text-muted text-sm ml-2">— {detail}</span>
         )}

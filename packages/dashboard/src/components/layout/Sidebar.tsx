@@ -22,16 +22,22 @@ function TaskItem({
     <button
       onClick={onClick}
       className={clsx(
-        'w-full text-left px-3 py-2 rounded-lg text-sm group',
+        'w-full text-left px-3 py-2.5 rounded-lg text-sm group relative',
         isSelected
-          ? 'bg-accent/10 shadow-glow-accent'
+          ? 'bg-accent/10 shadow-glow-accent ring-1 ring-accent/15'
           : 'hover:bg-surface-hover'
       )}
     >
-      <div className="truncate text-text-primary text-xs font-medium group-hover:text-accent">
+      {isSelected && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-accent rounded-r" />
+      )}
+      <div className={clsx(
+        'truncate text-xs font-medium',
+        isSelected ? 'text-accent' : 'text-text-primary group-hover:text-accent'
+      )}>
         {task.title}
       </div>
-      <div className="mt-1">
+      <div className="mt-1.5">
         <TaskStatusBadge status={task.status} />
       </div>
     </button>
@@ -54,15 +60,15 @@ function Section({
   if (tasks.length === 0) return null;
 
   return (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 px-3 mb-1.5">
+    <div className="mb-6">
+      <div className="flex items-center gap-2 px-3 mb-2">
         {dotColor && (
           <span className={clsx('w-1.5 h-1.5 rounded-full', dotColor)} />
         )}
         <span className="text-text-muted text-[10px] font-bold uppercase tracking-widest">
           {title}
         </span>
-        <span className="text-text-muted/60 text-[10px] font-mono">{tasks.length}</span>
+        <span className="text-text-muted/50 text-[10px] font-mono ml-auto">{tasks.length}</span>
       </div>
       <div className="space-y-0.5 px-1.5">
         {tasks.map((task) => (
@@ -88,7 +94,7 @@ export function Sidebar() {
   const recent = getRecentTasks(store);
 
   return (
-    <aside className="fixed left-0 top-14 bottom-0 w-60 bg-surface/40 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
+    <aside className="fixed left-0 top-14 bottom-0 w-60 glass border-r border-border/60 overflow-y-auto z-20">
       <div className="py-4">
         <Section
           title="Needs Attention"

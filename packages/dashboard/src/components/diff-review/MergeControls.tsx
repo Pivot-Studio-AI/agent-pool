@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { GitMerge, MessageSquare, X } from 'lucide-react';
 import { Button } from '../shared/Button';
 
 interface MergeControlsProps {
@@ -45,6 +46,7 @@ export function MergeControls({
           loading={loading}
           disabled={mergeDisabled}
         >
+          <GitMerge size={15} className="mr-0.5" />
           {testsRunning ? 'Tests Running...' : testsFailed ? 'Merge Anyway' : 'Approve & Merge'}
         </Button>
         <Button
@@ -52,6 +54,7 @@ export function MergeControls({
           onClick={handleRequestChanges}
           disabled={loading}
         >
+          <MessageSquare size={15} className="mr-0.5" />
           {showComments ? 'Submit Changes' : 'Request Changes'}
         </Button>
         <Button
@@ -59,6 +62,7 @@ export function MergeControls({
           onClick={onReject}
           disabled={loading}
         >
+          <X size={15} className="mr-0.5" />
           Reject
         </Button>
         {showComments && (
@@ -82,7 +86,7 @@ export function MergeControls({
           placeholder="Describe the changes you'd like the agent to make..."
           rows={4}
           autoFocus
-          className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
+          className="w-full bg-bg border border-border/60 rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 resize-none"
         />
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Check, X } from 'lucide-react';
 import { Button } from '../shared/Button';
 
 interface ApprovalControlsProps {
@@ -40,6 +41,7 @@ export function ApprovalControls({
           loading={loading}
           disabled={loading}
         >
+          <Check size={15} className="mr-0.5" />
           Approve Plan
         </Button>
         <Button
@@ -47,6 +49,7 @@ export function ApprovalControls({
           onClick={handleReject}
           disabled={loading}
         >
+          <X size={15} className="mr-0.5" />
           {showFeedback ? 'Submit Rejection' : 'Reject with Feedback'}
         </Button>
         {showFeedback && (
@@ -70,7 +73,7 @@ export function ApprovalControls({
           placeholder="Explain why you're rejecting this plan and what changes you'd like..."
           rows={4}
           autoFocus
-          className="w-full bg-bg border border-border rounded px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
+          className="w-full bg-bg border border-border/60 rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 resize-none"
         />
       )}
     </div>

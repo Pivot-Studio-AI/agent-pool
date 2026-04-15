@@ -109,7 +109,7 @@ export function PlanReview({ task }: PlanReviewProps) {
 
   if (loading) {
     return (
-      <div className="p-6 text-text-muted text-sm">Loading plan...</div>
+      <div className="p-6 text-text-muted text-sm animate-pulse-subtle">Loading plan...</div>
     );
   }
 
@@ -126,10 +126,10 @@ export function PlanReview({ task }: PlanReviewProps) {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl overflow-auto animate-fade-in">
+    <div className="p-6 space-y-6 max-w-4xl overflow-auto animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-lg font-bold text-text-primary mb-2">{task.title}</h1>
+        <h1 className="text-xl font-bold text-text-primary mb-3">{task.title}</h1>
         <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
           <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
             {task.priority}
@@ -150,7 +150,7 @@ export function PlanReview({ task }: PlanReviewProps) {
       </div>
 
       {/* Actions */}
-      <div className="border-b border-border pb-5">
+      <div className="border-b border-border/50 pb-6">
         <ApprovalControls
           taskId={task.id}
           planId={plan.id}
@@ -162,7 +162,7 @@ export function PlanReview({ task }: PlanReviewProps) {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red">
+        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red ring-1 ring-red/10">
           {error}
         </div>
       )}
