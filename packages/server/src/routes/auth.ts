@@ -95,8 +95,9 @@ authRouter.get('/github/callback', async (req, res, next) => {
     // Generate JWT
     const jwt = userService.generateJwt(user);
 
-    // Redirect to dashboard with token in hash
-    res.redirect(`${config.dashboardUrl}/#token=${jwt}`);
+    // Redirect to dashboard with token in hash (same origin in production)
+    const dashboardOrigin = config.dashboardUrl || `${req.protocol}://${req.get('host')}`;
+    res.redirect(`${dashboardOrigin}/#token=${jwt}`);
   } catch (err) {
     next(err);
   }
