@@ -787,8 +787,7 @@ async function runAgentLifecycle(
         // Monitor deployment (skip if no GitHub Actions workflows)
         const skipDeploy = process.env.SKIP_DEPLOY_MONITOR === 'true';
         if (skipDeploy) {
-          // Skip deploying state — go straight to completed if deploying fails
-          try { await api.updateTaskStatus(taskId, 'deploying'); } catch { /* deploying event type may not exist in DB */ }
+          // Go straight from merging → completed (server state machine now allows this)
           await api.updateTaskStatus(taskId, 'completed');
           console.log(`[lifecycle:${taskId.slice(0, 8)}] Task completed — pushed to ${mergeBranchTarget}!`);
         } else {

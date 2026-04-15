@@ -67,7 +67,7 @@ const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   awaiting_approval:  ['planning', 'executing', 'rejected', 'cancelled'],
   executing:          ['awaiting_review', 'errored', 'cancelled'],
   awaiting_review:    ['merging', 'executing', 'rejected', 'cancelled'],
-  merging:            ['deploying', 'errored', 'cancelled'],
+  merging:            ['deploying', 'completed', 'errored', 'cancelled'],
   deploying:          ['completed', 'errored'],
   // Terminal states — only allow retry (back to queued)
   completed:          [],
