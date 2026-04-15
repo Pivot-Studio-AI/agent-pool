@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth-store';
 
 export function UserMenu() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
+  const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
@@ -22,7 +23,17 @@ export function UserMenu() {
     };
   }, [open]);
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <button
+        onClick={login}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised active:scale-[0.97]"
+      >
+        <LogIn size={14} />
+        Sign In
+      </button>
+    );
+  }
 
   return (
     <div className="relative" ref={menuRef}>
