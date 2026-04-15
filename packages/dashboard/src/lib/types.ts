@@ -21,6 +21,7 @@ export interface Task {
   priority: TaskPriority;
   model_tier: string;
   target_branch: string;
+  repo_id: string | null;
   parent_task_id: string | null;
   attachments?: TaskAttachment[];
   deploy_status?: string | null;

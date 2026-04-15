@@ -1,7 +1,8 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
-import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw, ExternalLink, Rocket } from 'lucide-react';
+import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw, ExternalLink, Rocket, GitBranch, BookOpen } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
+import { useAuthStore } from '../../stores/auth-store';
 import { Badge } from '../shared/Badge';
 import { Button } from '../shared/Button';
 import { Card } from '../shared/Card';
@@ -104,16 +105,35 @@ function RetryButton({ task }: { task: Task }) {
 }
 
 function TaskMetadata({ task }: { task: Task }) {
+  const knownRepos = useAuthStore((s) => s.knownRepos);
+  const repo = knownRepos.find((r) => r.id === task.repo_id);
+  const repoName = repo?.github_full_name ?? null;
+
   return (
-    <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
-      <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
-        {task.priority}
-      </Badge>
-      <span className="text-text-muted text-xs">Model: <span className="text-text-secondary font-mono">{task.model_tier}</span></span>
-      <span className="text-text-muted text-xs">Branch: <span className="text-text-secondary font-mono">{task.target_branch}</span></span>
-      <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
-      <CancelButton task={task} />
-      <RetryButton task={task} />
+    <div className="space-y-2">
+      {/* Repo + branch bar */}
+      <div className="flex items-center gap-2">
+        {repoName && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border/60 text-xs font-mono text-text-primary">
+            <BookOpen size={11} className="text-accent" />
+            {repoName}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-border/60 text-xs font-mono text-text-primary">
+          <GitBranch size={11} className="text-green" />
+          {task.target_branch}
+        </div>
+      </div>
+      {/* Secondary metadata */}
+      <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
+        <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
+          {task.priority}
+        </Badge>
+        <span className="text-text-muted text-xs">Model: <span className="text-text-secondary font-mono">{task.model_tier}</span></span>
+        <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
+        <CancelButton task={task} />
+        <RetryButton task={task} />
+      </div>
     </div>
   );
 }
