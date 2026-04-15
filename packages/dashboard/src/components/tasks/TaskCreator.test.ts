@@ -110,3 +110,26 @@ describe('TaskCreator attachment previews in expanded panel', () => {
     expect(addAttBody).not.toContain('Only image files are supported');
   });
 });
+
+describe('TaskCreator placeholder text visibility fix', () => {
+  it('title input uses text-text-secondary for placeholder, not text-text-muted/50', () => {
+    // The title input placeholder was nearly invisible with text-text-muted/50
+    expect(source).toContain('placeholder:text-text-secondary');
+    expect(source).not.toContain('placeholder:text-text-muted/50');
+  });
+
+  it('description textarea also uses text-text-secondary for placeholder', () => {
+    // Both inputs should use the same visible placeholder color
+    const matches = source.match(/placeholder:text-text-secondary/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('title input placeholder text is present', () => {
+    expect(source).toContain('placeholder="Describe a task..."');
+  });
+
+  it('description textarea placeholder text is present', () => {
+    expect(source).toContain('placeholder="Provide more detail about the task..."');
+  });
+});
