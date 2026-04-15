@@ -25,6 +25,15 @@ export function mergeBranch(
   _taskBranch: string
 ): MergeResult {
   try {
+    // Ensure all changes are committed before merging (prevents "untracked files would be overwritten")
+    try {
+      execFileSync('git', ['-C', worktreePath, 'add', '-A'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', worktreePath, 'diff', '--cached', '--quiet'], { stdio: 'pipe' });
+    } catch {
+      // There are staged changes — commit them
+      execFileSync('git', ['-C', worktreePath, 'commit', '-m', 'chore: commit remaining changes before merge'], { stdio: 'pipe' });
+    }
+
     // Fetch latest target branch from remote
     execFileSync('git', ['-C', worktreePath, 'fetch', 'origin', targetBranch], {
       stdio: 'pipe',
