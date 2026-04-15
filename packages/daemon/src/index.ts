@@ -120,7 +120,8 @@ async function runFixedMode(): Promise<void> {
   const { daemon, slots } = await api.registerDaemon(
     daemonName,
     repoPath,
-    config.poolSize
+    config.poolSize,
+    config.repoId
   );
   const daemonId = daemon.id;
   console.log(`[daemon] Registered with ID: ${daemonId}, ${slots.length} slots created.`);
@@ -175,7 +176,7 @@ async function runFixedMode(): Promise<void> {
     if (shuttingDown) return;
 
     try {
-      const tasks = await api.getQueuedTasks();
+      const tasks = await api.getQueuedTasks(config.repoId);
       if (!tasks.length) return;
 
       const idleSlots = await api.getIdleSlots();
@@ -330,7 +331,7 @@ async function runDynamicMode(): Promise<void> {
         if (shuttingDown) return;
 
         try {
-          const tasks = await api.getQueuedTasks();
+          const tasks = await api.getQueuedTasks(repo.repo_id);
           if (!tasks.length) return;
 
           const idleSlots = await api.getIdleSlots();

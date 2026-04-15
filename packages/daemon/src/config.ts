@@ -9,6 +9,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const configSchema = z.object({
   repoPath: z.string().optional(),
+  repoId: z.string().uuid().optional(),
   reposBaseDir: z.string().default(path.join(os.homedir(), 'repos')),
   poolSize: z.number().int().positive().default(5),
   serverUrl: z.string().url('SERVER_URL must be a valid URL'),
@@ -25,6 +26,7 @@ export type Config = z.infer<typeof configSchema>;
 function loadConfig(): Config {
   const raw = {
     repoPath: process.env.REPO_PATH || undefined,
+    repoId: process.env.REPO_ID || undefined,
     reposBaseDir: process.env.REPOS_BASE_DIR || undefined,
     poolSize: process.env.POOL_SIZE ? parseInt(process.env.POOL_SIZE, 10) : undefined,
     serverUrl: process.env.SERVER_URL,

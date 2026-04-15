@@ -146,12 +146,14 @@ async function request<T>(
 export async function registerDaemon(
   name: string,
   repoPath: string,
-  poolSize: number
+  poolSize: number,
+  repoId?: string
 ): Promise<{ daemon: Daemon; slots: Slot[] }> {
   return request('POST', '/daemon/register', {
     name,
     repo_path: repoPath,
     pool_size: poolSize,
+    ...(repoId ? { repo_id: repoId } : {}),
   });
 }
 
@@ -163,10 +165,11 @@ export async function heartbeat(daemonId: string): Promise<void> {
 }
 
 /**
- * Get queued tasks (highest priority first).
+ * Get queued tasks (highest priority first), optionally filtered by repo.
  */
-export async function getQueuedTasks(): Promise<Task[]> {
-  return request('GET', '/tasks?status=queued&limit=1');
+export async function getQueuedTasks(repoId?: string): Promise<Task[]> {
+  const repoFilter = repoId ? `&repo_id=${encodeURIComponent(repoId)}` : '';
+  return request('GET', `/tasks?status=queued&limit=1${repoFilter}`);
 }
 
 /**
