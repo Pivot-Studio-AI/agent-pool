@@ -74,7 +74,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const savedRepo = localStorage.getItem('agent-pool-selected-repo');
       if (savedRepo) {
         try {
-          selectedRepo = JSON.parse(savedRepo) as Repository;
+          const parsed = JSON.parse(savedRepo) as Repository;
+          // Discard stale cached repos with empty/missing id — they'll be re-selected
+          if (parsed?.id) {
+            selectedRepo = parsed;
+          } else {
+            localStorage.removeItem('agent-pool-selected-repo');
+          }
         } catch {
           localStorage.removeItem('agent-pool-selected-repo');
         }
