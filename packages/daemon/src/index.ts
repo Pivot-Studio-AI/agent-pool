@@ -256,122 +256,94 @@ async function runFixedMode(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-// ---- Dynamic Mode (when REPO_PATH is not set, polls server for repo) ----
+// ---- Dynamic Mode — true multi-repo: manages all repos simultaneously ----
 
 async function runDynamicMode(): Promise<void> {
-  console.log('[daemon] Running in dynamic mode. Waiting for repo selection...');
+  console.log('[daemon] Running in multi-repo mode.');
+  console.log(`[daemon] Repos base: ${config.reposBaseDir}`);
+  console.log(`[daemon] Slots per repo: ${config.poolSize}`);
 
-  // Register daemon (without a fixed repo)
   const hostname = (await import('os')).default.hostname();
   const daemonName = `daemon-${hostname}-${process.pid}`;
-  console.log(`[daemon] Registering as "${daemonName}"...`);
 
-  const { daemon } = await api.registerDaemon(
-    daemonName,
-    config.reposBaseDir,
-    config.poolSize
-  );
+  const { daemon } = await api.registerDaemon(daemonName, config.reposBaseDir, config.poolSize);
   const daemonId = daemon.id;
   console.log(`[daemon] Registered with ID: ${daemonId}`);
 
-  // Start heartbeat
   const stopHeartbeat = startHeartbeat(daemonId, 30_000);
-  console.log('[daemon] Heartbeat started (30s interval).');
+  console.log('[daemon] Heartbeat started.');
 
-  let currentRepoId: string | null = null;
-  let currentRepoPath: string | null = null;
-  let currentDefaultBranch: string = config.defaultBranch;
-  let pool: WorktreePool | null = null;
-  let stopTaskPolling: (() => void) | null = null;
+  // Map of repoId → stopPolling function (tracks which repos are active)
+  const managedRepos = new Map<string, () => void>();
 
-  // Poll for repo selection every 5 seconds
-  const repoCheckInterval = setInterval(async () => {
-    if (shuttingDown) return;
+  async function activateRepo(repo: api.Repo): Promise<void> {
+    const repoPath = ensureRepo(repo.github_full_name, repo.github_url, config.reposBaseDir);
+    const defaultBranch = repo.default_branch || config.defaultBranch;
 
-    try {
-      const repo = await api.getCurrentRepo();
-      if (!repo) return;
+    await api.ackRepo(daemonId, repo.repo_id, repoPath);
+    await api.ensureRepoSlots(repo.repo_id, config.poolSize, repoPath);
 
-      if (repo.repo_id === currentRepoId) return; // No change
+    const pool = new WorktreePool(repoPath, config.poolSize, defaultBranch);
+    await pool.provision();
 
-      console.log(`[daemon] Repo selected: ${repo.github_full_name}`);
+    const stopPolling = startPolling(config.pollIntervalMs, async () => {
+      if (shuttingDown) return;
+      try {
+        const tasks = await api.getQueuedTasks(repo.repo_id);
+        if (!tasks.length) return;
 
-      // If we were working on another repo, stop task polling
-      if (stopTaskPolling) {
-        stopTaskPolling();
-        stopTaskPolling = null;
-      }
+        const idleSlots = await api.getIdleSlots(repo.repo_id);
+        if (!idleSlots.length) return;
 
-      if (pool && currentRepoPath) {
-        console.log('[daemon] Switching repos. Cleaning up previous pool...');
-        // Note: active agents on the old repo will finish naturally via activeAgents map
-      }
-
-      // Ensure repo exists locally (clone if needed)
-      const repoPath = ensureRepo(
-        repo.github_full_name,
-        repo.github_url,
-        config.reposBaseDir
-      );
-
-      currentRepoId = repo.repo_id;
-      currentRepoPath = repoPath;
-      currentDefaultBranch = repo.default_branch || config.defaultBranch;
-
-      // Acknowledge repo setup to server
-      await api.ackRepo(daemonId, repo.repo_id, repoPath);
-      console.log(`[daemon] Repo acknowledged: ${repoPath}`);
-
-      // Provision worktrees for this repo
-      pool = new WorktreePool(repoPath, config.poolSize, currentDefaultBranch);
-      await pool.provision();
-
-      // Start task polling for this repo
-      stopTaskPolling = startPolling(config.pollIntervalMs, async () => {
-        if (shuttingDown) return;
+        const task = tasks[0];
+        const slot = idleSlots[0];
 
         try {
-          const tasks = await api.getQueuedTasks(repo.repo_id);
-          if (!tasks.length) return;
-
-          const idleSlots = await api.getIdleSlots();
-          if (!idleSlots.length) return;
-
-          const task = tasks[0];
-          const slot = idleSlots[0];
-
-          try {
-            await api.claimSlot(slot.id, task.id, daemonId);
-          } catch {
-            // Another daemon claimed it first — skip
-            return;
-          }
-
-          // Immediately move task out of 'queued' so the next poll tick won't pick it up again
-          try {
-            await api.updateTaskStatus(task.id, 'planning');
-          } catch {
-            // If this fails, the lifecycle will retry — not fatal here
-          }
-
-          console.log(
-            `[daemon] Task "${task.title}" (${task.id}) claimed slot ${slot.slot_number}`
-          );
-
-          // Run agent lifecycle with the current repo path
-          runAgentLifecycle(task, slot, daemonId, pool!, currentRepoPath!, currentDefaultBranch).catch((err) => {
-            console.error(`[daemon] Unhandled error in agent lifecycle for task ${task.id}:`, err);
-          });
-        } catch (err) {
-          console.error('[daemon] Polling error:', err);
+          await api.claimSlot(slot.id, task.id, daemonId);
+        } catch {
+          return; // Another daemon beat us to it
         }
-      });
 
-      console.log(`[daemon] Now working on ${repo.github_full_name} at ${repoPath}`);
+        try {
+          await api.updateTaskStatus(task.id, 'planning');
+        } catch { /* lifecycle will handle it */ }
+
+        console.log(`[daemon:${repo.github_full_name}] Task "${task.title}" → slot ${slot.slot_number}`);
+
+        runAgentLifecycle(task, slot, daemonId, pool, repoPath, defaultBranch).catch((err) => {
+          console.error(`[daemon] Unhandled lifecycle error for task ${task.id}:`, err);
+        });
+      } catch (err) {
+        console.error(`[daemon:${repo.github_full_name}] Polling error:`, err);
+      }
+    });
+
+    managedRepos.set(repo.repo_id, stopPolling);
+    console.log(`[daemon] Activated repo: ${repo.github_full_name} (${config.poolSize} slots)`);
+  }
+
+  // Sync repos from server — activate new ones
+  async function syncRepos(): Promise<void> {
+    if (shuttingDown) return;
+    try {
+      const repos = await api.getAllRepos();
+      for (const repo of repos) {
+        if (!managedRepos.has(repo.repo_id)) {
+          await activateRepo(repo).catch((err) => {
+            console.error(`[daemon] Failed to activate ${repo.github_full_name}:`, err instanceof Error ? err.message : err);
+          });
+        }
+      }
     } catch (err) {
-      console.error('[daemon] Repo check error:', err);
+      console.error('[daemon] Repo sync error:', err instanceof Error ? err.message : err);
     }
-  }, 5000);
+  }
+
+  // Initial sync + periodic re-sync every 30s to pick up newly added repos
+  await syncRepos();
+  const repoSyncInterval = setInterval(syncRepos, 30_000);
+
+  console.log(`[daemon] Ready. Managing ${managedRepos.size} repo(s). Polling every ${config.pollIntervalMs}ms.`);
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
@@ -379,31 +351,22 @@ async function runDynamicMode(): Promise<void> {
     shuttingDown = true;
     console.log(`\n[daemon] Received ${signal}. Shutting down gracefully...`);
 
-    clearInterval(repoCheckInterval);
-    if (stopTaskPolling) stopTaskPolling();
+    clearInterval(repoSyncInterval);
+    for (const stop of managedRepos.values()) stop();
     stopHeartbeat();
 
-    // Wait for active agents with a timeout
     if (activeAgents.size > 0) {
       console.log(`[daemon] Waiting for ${activeAgents.size} active agent(s) to finish...`);
-      const timeout = 30_000;
       const start = Date.now();
-
-      while (activeAgents.size > 0 && Date.now() - start < timeout) {
+      while (activeAgents.size > 0 && Date.now() - start < 30_000) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-
-      // Kill remaining agents
       if (activeAgents.size > 0) {
-        console.log(`[daemon] Timeout reached. Killing ${activeAgents.size} remaining agent(s).`);
+        console.log(`[daemon] Timeout. Killing ${activeAgents.size} remaining agent(s).`);
         for (const agent of activeAgents.values()) {
           agent.kill();
-          try {
-            await api.updateTaskStatus(agent.taskId, 'errored', 'Daemon shutdown — task interrupted');
-          } catch { /* best effort */ }
-          try {
-            await api.releaseSlot(agent.slotId);
-          } catch { /* best effort */ }
+          try { await api.updateTaskStatus(agent.taskId, 'errored', 'Daemon shutdown — task interrupted'); } catch { /* best effort */ }
+          try { await api.releaseSlot(agent.slotId); } catch { /* best effort */ }
         }
       }
     }

@@ -26,9 +26,16 @@ export interface UpdateSlotFields {
 // ─── Service ─────────────────────────────────────────────────────────
 
 /**
- * List all slots ordered by slot_number.
+ * List slots ordered by slot_number, optionally filtered by repo.
  */
-export async function listSlots(): Promise<SlotRow[]> {
+export async function listSlots(repoId?: string): Promise<SlotRow[]> {
+  if (repoId) {
+    const result = await query<SlotRow>(
+      'SELECT * FROM slots WHERE repo_id = $1 ORDER BY slot_number',
+      [repoId],
+    );
+    return result.rows;
+  }
   const result = await query<SlotRow>('SELECT * FROM slots ORDER BY slot_number');
   return result.rows;
 }

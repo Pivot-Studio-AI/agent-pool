@@ -180,11 +180,26 @@ export async function getTasksByStatus(status: string): Promise<Task[]> {
 }
 
 /**
- * Get all slots, filter client-side for idle ones.
+ * Get idle slots, optionally filtered by repo.
  */
-export async function getIdleSlots(): Promise<Slot[]> {
-  const slots = await request<Slot[]>('GET', '/slots');
+export async function getIdleSlots(repoId?: string): Promise<Slot[]> {
+  const repoFilter = repoId ? `?repo_id=${encodeURIComponent(repoId)}` : '';
+  const slots = await request<Slot[]>('GET', `/slots${repoFilter}`);
   return slots.filter((s) => s.status === 'idle');
+}
+
+/**
+ * Get all repositories (for multi-repo daemon mode).
+ */
+export async function getAllRepos(): Promise<Repo[]> {
+  return request('GET', '/daemon/repos');
+}
+
+/**
+ * Ensure slots exist for a repo (upserts pool_size slots).
+ */
+export async function ensureRepoSlots(repoId: string, poolSize: number, basePath: string): Promise<Slot[]> {
+  return request('POST', '/daemon/repo-slots', { repo_id: repoId, pool_size: poolSize, base_path: basePath });
 }
 
 /**

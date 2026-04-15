@@ -14,11 +14,12 @@ const claimSlotSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// GET /slots — List all slots
+// GET /slots — List all slots (optionally filtered by ?repo_id=)
 // ---------------------------------------------------------------------------
 slotRouter.get('/', async (req, res, next) => {
   try {
-    const slots = await listSlots();
+    const repoId = typeof req.query.repo_id === 'string' ? req.query.repo_id : undefined;
+    const slots = await listSlots(repoId);
     res.json({ data: slots });
   } catch (err) {
     next(err);
