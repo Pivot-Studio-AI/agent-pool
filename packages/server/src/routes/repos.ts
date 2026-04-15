@@ -42,14 +42,8 @@ repoRouter.get('/github', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 repoRouter.post('/select', async (req, res, next) => {
   try {
-    if (!req.user) {
-      res.status(401).json({
-        error: { message: 'Unauthorized', code: 'AUTH_FAILED' },
-      });
-      return;
-    }
-
     const data = selectRepoSchema.parse(req.body);
+    const userId = req.user?.id ?? null;
 
     const result = await query(
       `INSERT INTO repositories (github_full_name, github_url, default_branch, user_id)
@@ -57,9 +51,9 @@ repoRouter.post('/select', async (req, res, next) => {
        ON CONFLICT (github_full_name) DO UPDATE
          SET github_url = EXCLUDED.github_url,
              default_branch = EXCLUDED.default_branch,
-             user_id = EXCLUDED.user_id
+             user_id = COALESCE(EXCLUDED.user_id, repositories.user_id)
        RETURNING *`,
-      [data.full_name, data.github_url, data.default_branch, req.user.id],
+      [data.full_name, data.github_url, data.default_branch, userId],
     );
 
     res.status(201).json({ data: result.rows[0] });
@@ -73,17 +67,10 @@ repoRouter.post('/select', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 repoRouter.get('/', async (req, res, next) => {
   try {
-    if (!req.user) {
-      res.status(401).json({
-        error: { message: 'Unauthorized', code: 'AUTH_FAILED' },
-      });
-      return;
-    }
-
-    const result = await query(
-      'SELECT * FROM repositories WHERE user_id = $1 ORDER BY created_at DESC',
-      [req.user.id],
-    );
+    // API key auth has no user — return all repos
+    const result = req.user
+      ? await query('SELECT * FROM repositories WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id])
+      : await query('SELECT * FROM repositories ORDER BY created_at DESC');
 
     res.json({ data: result.rows });
   } catch (err) {
