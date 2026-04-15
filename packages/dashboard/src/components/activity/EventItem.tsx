@@ -68,10 +68,38 @@ interface EventItemProps {
   event: AppEvent;
 }
 
+function getEventDetail(event: AppEvent): string | null {
+  const p = event.payload;
+  if (!p) return null;
+
+  switch (event.event_type) {
+    case 'task_errored':
+      return p.reason || p.error || p.message || null;
+    case 'merge_failed':
+      return p.reason || p.error || p.message || null;
+    case 'plan_rejected':
+      return p.feedback || p.reason || p.reviewer_feedback || null;
+    case 'review_rejected':
+      return p.feedback || p.reason || null;
+    case 'review_changes_requested':
+      return p.comments || p.feedback || null;
+    case 'agent_question':
+      return p.question || p.message || null;
+    case 'conflict_detected':
+      return p.file_path || p.message || null;
+    case 'task_rejected':
+      return p.feedback || p.reason || null;
+    default:
+      return p.message || p.title || null;
+  }
+}
+
 export function EventItem({ event }: EventItemProps) {
   const dotColor = EVENT_DOT_COLORS[event.event_type] || 'bg-text-muted';
   const description = EVENT_DESCRIPTIONS[event.event_type] || event.event_type;
-  const detail = event.payload?.message || event.payload?.title || '';
+  const detail = getEventDetail(event);
+  const isError = event.event_type === 'task_errored' || event.event_type === 'merge_failed';
+  const isRejection = event.event_type === 'plan_rejected' || event.event_type === 'review_rejected' || event.event_type === 'task_rejected';
 
   return (
     <div className="flex items-start gap-3 py-2.5 px-3 rounded-lg hover:bg-surface-hover/40 group">
@@ -81,10 +109,20 @@ export function EventItem({ event }: EventItemProps) {
       <span className="relative flex h-2 w-2 shrink-0 mt-1.5">
         <span className={`relative inline-flex rounded-full h-2 w-2 ${dotColor}`} />
       </span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <span className="text-text-secondary text-sm group-hover:text-text-primary">{description}</span>
         {detail && (
-          <span className="text-text-muted text-sm ml-2">— {detail}</span>
+          <div
+            className={`text-xs mt-1 rounded px-2 py-1 ${
+              isError
+                ? 'text-red bg-red/5 border border-red/15'
+                : isRejection
+                  ? 'text-red/80 bg-red/5 border border-red/15'
+                  : 'text-text-muted'
+            }`}
+          >
+            {detail}
+          </div>
         )}
       </div>
     </div>

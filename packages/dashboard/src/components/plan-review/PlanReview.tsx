@@ -75,6 +75,11 @@ export function PlanReview({ task }: PlanReviewProps) {
   }, [fetchPlans]);
 
   const plan = plans[plans.length - 1]; // Latest plan
+  const planAttempt = plans.length;
+  const maxPlanRetries = 5;
+
+  // Find rejection feedback from previous plans
+  const previousRejections = plans.filter((p) => p.status === 'rejected' && p.reviewer_feedback);
 
   const handleApprove = useCallback(async () => {
     if (!plan) return;
@@ -129,7 +134,14 @@ export function PlanReview({ task }: PlanReviewProps) {
     <div className="p-6 space-y-6 max-w-4xl overflow-auto animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-text-primary mb-3">{task.title}</h1>
+        <div className="flex items-center gap-3 mb-3">
+          <h1 className="text-xl font-bold text-text-primary">{task.title}</h1>
+          {planAttempt > 1 && (
+            <Badge color="amber">
+              Plan attempt {planAttempt}/{maxPlanRetries}
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
           <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
             {task.priority}
@@ -164,6 +176,20 @@ export function PlanReview({ task }: PlanReviewProps) {
       {error && (
         <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red ring-1 ring-red/10">
           {error}
+        </div>
+      )}
+
+      {/* Previous Rejection Feedback */}
+      {previousRejections.length > 0 && (
+        <div className="space-y-2">
+          {previousRejections.map((p, i) => (
+            <div key={p.id} className="bg-red/5 border border-red/20 rounded-lg px-4 py-3 ring-1 ring-red/10">
+              <h3 className="text-[10px] font-bold text-red uppercase tracking-widest mb-1.5">
+                Plan {i + 1} Rejected
+              </h3>
+              <div className="text-sm text-red/80">{p.reviewer_feedback}</div>
+            </div>
+          ))}
         </div>
       )}
 

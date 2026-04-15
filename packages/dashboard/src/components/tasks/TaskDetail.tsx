@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import { Loader, Clock, CheckCircle, XCircle, AlertTriangle, Ban, RotateCcw } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
@@ -7,9 +7,10 @@ import { Button } from '../shared/Button';
 import { Card } from '../shared/Card';
 import { PlanReview } from '../plan-review/PlanReview';
 import { DiffReview } from '../diff-review/DiffReview';
+import { TaskTimeline } from './TaskTimeline';
 import { PRIORITY_COLORS } from '../../lib/constants';
 import { api } from '../../api/client';
-import type { Task } from '../../lib/types';
+import type { Task, AppEvent, Plan } from '../../lib/types';
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -243,13 +244,57 @@ function DeployingView({ task }: { task: Task }) {
 
 function CompletedView({ task }: { task: Task }) {
   const events = useEventStore((s) => s.events);
-  const errorReason = useMemo(() => {
-    if (task.status !== 'errored') return null;
-    const errorEvent = events.find(
-      (e) => e.task_id === task.id && e.event_type === 'task_errored'
-    );
-    return errorEvent?.payload?.reason as string | undefined;
-  }, [events, task.id, task.status]);
+  const [taskEvents, setTaskEvents] = useState<AppEvent[]>([]);
+  const [rejectionFeedback, setRejectionFeedback] = useState<string[]>([]);
+
+  // Fetch task-specific events for better error/rejection details
+  useEffect(() => {
+    api.get<AppEvent[]>(`/events?task_id=${task.id}&limit=100`).then(setTaskEvents).catch(() => {});
+  }, [task.id]);
+
+  // Also fetch plans to get rejection feedback
+  useEffect(() => {
+    if (task.status === 'rejected') {
+      api.get<Plan[]>(`/tasks/${task.id}/plans`).then((plans) => {
+        const feedback = plans
+          .filter((p) => p.status === 'rejected' && p.reviewer_feedback)
+          .map((p) => p.reviewer_feedback as string);
+        setRejectionFeedback(feedback);
+      }).catch(() => {});
+    }
+  }, [task.id, task.status]);
+
+  // Gather error details from events (both from store and fetched)
+  const errorDetails = useMemo(() => {
+    const allEvents = [...events, ...taskEvents];
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const unique = allEvents.filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
+
+    if (task.status === 'errored') {
+      const errorEvent = unique.find(
+        (e) => e.task_id === task.id && (e.event_type === 'task_errored' || e.event_type === 'merge_failed')
+      );
+      if (errorEvent?.payload) {
+        return errorEvent.payload.reason || errorEvent.payload.error || errorEvent.payload.message || null;
+      }
+    }
+
+    if (task.status === 'rejected') {
+      const rejectEvent = unique.find(
+        (e) => e.task_id === task.id && (e.event_type === 'task_rejected' || e.event_type === 'review_rejected' || e.event_type === 'plan_rejected')
+      );
+      if (rejectEvent?.payload) {
+        return rejectEvent.payload.feedback || rejectEvent.payload.reason || rejectEvent.payload.message || null;
+      }
+    }
+
+    return null;
+  }, [events, taskEvents, task.id, task.status]);
 
   const icon =
     task.status === 'completed' ? (
@@ -277,20 +322,50 @@ function CompletedView({ task }: { task: Task }) {
     : 'text-red';
 
   return (
-    <StatusView
-      task={task}
-      icon={icon}
-      label={label}
-      labelColor={labelColor}
-      subtitle={task.completed_at ? `Finished ${timeAgo(task.completed_at)}` : undefined}
-      extra={
-        errorReason ? (
-          <div className="text-red text-xs mt-2 px-6 max-w-lg text-center break-words bg-red/5 rounded-lg p-3 ring-1 ring-red/10">
-            {errorReason}
+    <div className="p-6 space-y-5 max-w-3xl animate-fade-in">
+      <div>
+        <h1 className="text-lg font-bold text-text-primary mb-2">{task.title}</h1>
+        <TaskMetadata task={task} />
+      </div>
+      <Card>
+        <div className="flex flex-col items-center gap-4 py-8">
+          <div className="p-3 rounded-2xl bg-surface-hover ring-1 ring-white/[0.04]">
+            {icon}
           </div>
-        ) : null
-      }
-    />
+          <div className={`${labelColor} font-semibold text-sm`}>{label}</div>
+          {task.completed_at && (
+            <div className="text-text-muted text-xs font-mono">Finished {timeAgo(task.completed_at)}</div>
+          )}
+        </div>
+      </Card>
+
+      {/* Error details */}
+      {errorDetails && (
+        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-3 ring-1 ring-red/10">
+          <h3 className="text-[10px] font-bold text-red uppercase tracking-widest mb-1.5">
+            {task.status === 'errored' ? 'Error Details' : 'Rejection Reason'}
+          </h3>
+          <div className="text-sm text-red/80 whitespace-pre-wrap break-words">{errorDetails}</div>
+        </div>
+      )}
+
+      {/* Plan rejection feedback for rejected tasks */}
+      {rejectionFeedback.length > 0 && (
+        <div className="space-y-2">
+          {rejectionFeedback.map((feedback, i) => (
+            <div key={i} className="bg-red/5 border border-red/20 rounded-lg px-4 py-3 ring-1 ring-red/10">
+              <h3 className="text-[10px] font-bold text-red uppercase tracking-widest mb-1.5">
+                Plan Rejection Feedback
+              </h3>
+              <div className="text-sm text-red/80">{feedback}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Timeline */}
+      <TaskTimeline taskId={task.id} />
+    </div>
   );
 }
 
