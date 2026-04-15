@@ -2,10 +2,10 @@ import { clsx } from 'clsx';
 import { useSlotStore } from '../../stores/slot-store';
 import type { SlotStatus } from '../../lib/types';
 
-const dotColor: Record<SlotStatus, string> = {
-  idle: 'bg-text-muted/40',
-  claimed: 'bg-green',
-  active: 'bg-green',
+const dotStyles: Record<SlotStatus, string> = {
+  idle: 'bg-text-muted/30',
+  claimed: 'bg-green shadow-glow-green',
+  active: 'bg-green shadow-glow-green animate-pulse-subtle',
   cleaning: 'bg-amber',
   quarantined: 'bg-red',
 };
@@ -16,12 +16,12 @@ export function SlotIndicator() {
   if (slots.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {slots.map((slot) => (
         <div
           key={slot.id}
           title={`Slot ${slot.slot_number}: ${slot.status}${slot.branch_name ? ` (${slot.branch_name})` : ''}`}
-          className={clsx('w-2.5 h-2.5 rounded-full', dotColor[slot.status] ?? 'bg-text-muted/40')}
+          className={clsx('w-2 h-2 rounded-full', dotStyles[slot.status] ?? 'bg-text-muted/30')}
         />
       ))}
     </div>

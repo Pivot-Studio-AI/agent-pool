@@ -62,8 +62,8 @@ function CancelButton({ task }: { task: Task }) {
   return (
     <>
       <Button variant="danger" size="sm" onClick={handleCancel} loading={cancelling} disabled={cancelling}>
-        <Ban size={14} className="mr-1" />
-        Cancel Task
+        <Ban size={13} className="mr-1" />
+        Cancel
       </Button>
       {error && <span className="text-red text-xs">{error}</span>}
     </>
@@ -94,7 +94,7 @@ function RetryButton({ task }: { task: Task }) {
   return (
     <>
       <Button variant="default" size="sm" onClick={handleRetry} loading={retrying} disabled={retrying}>
-        <RotateCcw size={14} className="mr-1" />
+        <RotateCcw size={13} className="mr-1" />
         Retry
       </Button>
       {error && <span className="text-red text-xs">{error}</span>}
@@ -104,15 +104,50 @@ function RetryButton({ task }: { task: Task }) {
 
 function TaskMetadata({ task }: { task: Task }) {
   return (
-    <div className="flex items-center gap-4 text-sm text-text-secondary flex-wrap">
+    <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
       <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
         {task.priority}
       </Badge>
-      <span>Model: {task.model_tier}</span>
-      <span>Branch: {task.target_branch}</span>
-      <span>Created {timeAgo(task.created_at)}</span>
+      <span className="text-text-muted text-xs">Model: <span className="text-text-secondary font-mono">{task.model_tier}</span></span>
+      <span className="text-text-muted text-xs">Branch: <span className="text-text-secondary font-mono">{task.target_branch}</span></span>
+      <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
       <CancelButton task={task} />
       <RetryButton task={task} />
+    </div>
+  );
+}
+
+function StatusView({
+  task,
+  icon,
+  iconColor,
+  label,
+  labelColor,
+  subtitle,
+  extra,
+}: {
+  task: Task;
+  icon: React.ReactNode;
+  iconColor?: string;
+  label: string;
+  labelColor: string;
+  subtitle?: string;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="p-6 space-y-5 max-w-3xl animate-fade-in">
+      <div>
+        <h1 className="text-lg font-bold text-text-primary mb-2">{task.title}</h1>
+        <TaskMetadata task={task} />
+      </div>
+      <Card>
+        <div className="flex flex-col items-center gap-3 py-6">
+          {icon}
+          <div className={`${labelColor} font-semibold text-sm`}>{label}</div>
+          {subtitle && <div className="text-text-muted text-xs font-mono">{subtitle}</div>}
+          {extra}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -129,27 +164,20 @@ function ExecutingView({ task }: { task: Task }) {
   }, [events, task.id]);
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <Loader className="text-green animate-spin" size={32} />
-          <div className="text-green font-medium">Agent is building...</div>
-          <div className="text-text-muted text-sm">
-            Elapsed: {elapsed(task.created_at)}
+    <StatusView
+      task={task}
+      icon={<Loader className="text-green animate-spin" size={28} />}
+      label="Agent is building..."
+      labelColor="text-green"
+      subtitle={`Elapsed: ${elapsed(task.created_at)}`}
+      extra={
+        latestProgress ? (
+          <div className="text-text-secondary text-xs text-center mt-1 px-6 max-w-md">
+            {latestProgress.payload?.message || 'Working...'}
           </div>
-          {latestProgress && (
-            <div className="text-text-secondary text-sm text-center mt-2 px-4">
-              {latestProgress.payload?.message || 'Working...'}
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
+        ) : null
+      }
+    />
   );
 }
 
@@ -165,85 +193,49 @@ function QueuedView({ task }: { task: Task }) {
   }, [tasks, task.id]);
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <Clock className="text-text-muted" size={32} />
-          <div className="text-text-secondary font-medium">Waiting in Queue</div>
-          <div className="text-text-muted text-sm">
-            Position #{queuePosition} in queue
-          </div>
-        </div>
-      </Card>
-    </div>
+    <StatusView
+      task={task}
+      icon={<Clock className="text-text-muted" size={28} />}
+      label="Waiting in Queue"
+      labelColor="text-text-secondary"
+      subtitle={`Position #${queuePosition}`}
+    />
   );
 }
 
 function PlanningView({ task }: { task: Task }) {
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <Loader className="text-accent animate-spin" size={32} />
-          <div className="text-accent font-medium">Agent is analyzing...</div>
-          <div className="text-text-muted text-sm">
-            Generating a plan for this task
-          </div>
-        </div>
-      </Card>
-    </div>
+    <StatusView
+      task={task}
+      icon={<Loader className="text-accent animate-spin" size={28} />}
+      label="Agent is analyzing..."
+      labelColor="text-accent"
+      subtitle="Generating a plan for this task"
+    />
   );
 }
 
 function MergingView({ task }: { task: Task }) {
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <Loader className="text-purple animate-spin" size={32} />
-          <div className="text-purple font-medium">Merging...</div>
-          <div className="text-text-muted text-sm">
-            Merging changes into {task.target_branch}
-          </div>
-        </div>
-      </Card>
-    </div>
+    <StatusView
+      task={task}
+      icon={<Loader className="text-purple animate-spin" size={28} />}
+      label="Merging..."
+      labelColor="text-purple"
+      subtitle={`Merging changes into ${task.target_branch}`}
+    />
   );
 }
 
 function DeployingView({ task }: { task: Task }) {
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          <Loader className="text-purple animate-spin" size={32} />
-          <div className="text-purple font-medium">Deploying to production...</div>
-          <div className="text-text-muted text-sm">
-            Monitoring GitHub Actions deploy
-          </div>
-        </div>
-      </Card>
-    </div>
+    <StatusView
+      task={task}
+      icon={<Loader className="text-purple animate-spin" size={28} />}
+      label="Deploying to production..."
+      labelColor="text-purple"
+      subtitle="Monitoring GitHub Actions deploy"
+    />
   );
 }
 
@@ -259,13 +251,13 @@ function CompletedView({ task }: { task: Task }) {
 
   const icon =
     task.status === 'completed' ? (
-      <CheckCircle className="text-green" size={32} />
+      <CheckCircle className="text-green" size={28} />
     ) : task.status === 'errored' ? (
-      <XCircle className="text-red" size={32} />
+      <XCircle className="text-red" size={28} />
     ) : task.status === 'cancelled' ? (
-      <Ban className="text-text-muted" size={32} />
+      <Ban className="text-text-muted" size={28} />
     ) : (
-      <AlertTriangle className="text-red" size={32} />
+      <AlertTriangle className="text-red" size={28} />
     );
 
   const label =
@@ -283,29 +275,20 @@ function CompletedView({ task }: { task: Task }) {
     : 'text-red';
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-xl font-bold text-text-primary mb-2">{task.title}</h1>
-        <TaskMetadata task={task} />
-      </div>
-
-      <Card>
-        <div className="flex flex-col items-center gap-4 py-4">
-          {icon}
-          <div className={`${labelColor} font-medium`}>{label}</div>
-          {task.completed_at && (
-            <div className="text-text-muted text-sm">
-              Finished {timeAgo(task.completed_at)}
-            </div>
-          )}
-          {errorReason && (
-            <div className="text-red text-xs mt-2 px-4 max-w-lg text-center break-words">
-              {errorReason}
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
+    <StatusView
+      task={task}
+      icon={icon}
+      label={label}
+      labelColor={labelColor}
+      subtitle={task.completed_at ? `Finished ${timeAgo(task.completed_at)}` : undefined}
+      extra={
+        errorReason ? (
+          <div className="text-red text-xs mt-1 px-6 max-w-lg text-center break-words bg-red/5 rounded-lg p-3">
+            {errorReason}
+          </div>
+        ) : null
+      }
+    />
   );
 }
 

@@ -126,31 +126,31 @@ export function PlanReview({ task }: PlanReviewProps) {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl overflow-auto">
+    <div className="p-6 space-y-5 max-w-4xl overflow-auto animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-bold text-text-primary mb-3">{task.title}</h1>
-        <div className="flex items-center gap-4 text-sm text-text-secondary flex-wrap">
+        <h1 className="text-lg font-bold text-text-primary mb-2">{task.title}</h1>
+        <div className="flex items-center gap-3 text-sm text-text-secondary flex-wrap">
           <Badge color={PRIORITY_COLORS[task.priority]?.replace('text-', '') || 'text-secondary'}>
             {task.priority}
           </Badge>
           <Badge color={STATUS_COLORS[task.status]?.replace('text-', '') || 'text-secondary'}>
             {task.status.replace(/_/g, ' ')}
           </Badge>
-          <span>Model: {task.model_tier}</span>
-          <span className="flex items-center gap-1">
-            <GitBranch size={14} />
-            {task.target_branch}
+          <span className="text-text-muted text-xs">Model: <span className="font-mono">{task.model_tier}</span></span>
+          <span className="flex items-center gap-1 text-text-muted text-xs">
+            <GitBranch size={12} />
+            <span className="font-mono">{task.target_branch}</span>
           </span>
-          <span className="flex items-center gap-1">
-            <Clock size={14} />
+          <span className="flex items-center gap-1 text-text-muted text-xs font-mono">
+            <Clock size={12} />
             {timeAgo(task.created_at)}
           </span>
         </div>
       </div>
 
-      {/* Actions — at top for quick access */}
-      <div className="border-b border-border pb-6">
+      {/* Actions */}
+      <div className="border-b border-border pb-5">
         <ApprovalControls
           taskId={task.id}
           planId={plan.id}
@@ -162,7 +162,7 @@ export function PlanReview({ task }: PlanReviewProps) {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red/10 border border-red/30 rounded px-4 py-2 text-sm text-red">
+        <div className="bg-red/5 border border-red/20 rounded-lg px-4 py-2.5 text-sm text-red">
           {error}
         </div>
       )}
@@ -181,7 +181,7 @@ export function PlanReview({ task }: PlanReviewProps) {
       {/* Estimate */}
       {plan.estimate && (
         <Card>
-          <h3 className="text-sm font-bold text-text-primary mb-2">Estimate</h3>
+          <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Estimate</h3>
           <div className="text-sm text-text-secondary">{plan.estimate}</div>
         </Card>
       )}

@@ -14,32 +14,31 @@ export function Header({ isConnected }: HeaderProps) {
   const selectedRepo = useAuthStore((s) => s.selectedRepo);
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-28 bg-surface/80 backdrop-blur-md border-b border-border z-30 flex items-center px-5 py-2">
+    <header className="fixed top-0 left-0 right-0 h-14 bg-surface/70 backdrop-blur-xl border-b border-border z-30 flex items-center px-4 gap-3">
       {/* Left: Logo */}
-      <div className="flex items-center gap-2.5">
-        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-accent/10 border border-accent/20">
-          <Bot className="w-[18px] h-[18px] text-accent" strokeWidth={2} />
+      <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-accent/10 shadow-glow-accent">
+          <Bot className="w-4 h-4 text-accent" strokeWidth={2.5} />
         </div>
-        <div className="font-semibold text-text-primary text-base whitespace-nowrap tracking-tight">
+        <span className="font-semibold text-text-primary text-sm tracking-tight">
           Agent Pool
-        </div>
+        </span>
       </div>
 
       {/* Repo Selector */}
-      <div className="ml-4">
+      <div className="shrink-0">
         <RepoSelector />
       </div>
 
       {/* Center: Task Creator (only if repo selected) */}
-      {selectedRepo && <TaskCreator />}
-      {!selectedRepo && <div className="flex-1" />}
+      {selectedRepo ? <TaskCreator /> : <div className="flex-1" />}
 
-      {/* Right: Slots + Connection Status + User Menu */}
-      <div className="flex items-center gap-3">
+      {/* Right: Slots + Connection + Theme + User */}
+      <div className="flex items-center gap-3 shrink-0">
         <SlotIndicator />
         <div className="flex items-center gap-1.5" title={isConnected ? 'Connected' : 'Disconnected'}>
-          <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green' : 'bg-red'}`} />
-          <span className="text-xs text-text-muted">{isConnected ? 'Live' : 'Offline'}</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green animate-pulse-subtle' : 'bg-red'}`} />
+          <span className="text-[11px] text-text-muted font-medium">{isConnected ? 'Live' : 'Offline'}</span>
         </div>
         <ThemeToggle />
         <UserMenu />

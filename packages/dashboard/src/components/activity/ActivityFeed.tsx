@@ -81,16 +81,16 @@ export function ActivityFeed() {
   }, [events, tasks]);
 
   return (
-    <div className="p-6 flex flex-col h-full max-w-4xl">
+    <div className="p-6 flex flex-col h-full max-w-4xl animate-fade-in">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-text-primary">Activity Feed</h2>
+        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider">Activity Feed</h2>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Event type filter */}
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-bg border border-border rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-accent"
+            className="bg-bg border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
           >
             <option value="all">All Events</option>
             {ALL_EVENT_TYPES.map((type) => (
@@ -104,7 +104,7 @@ export function ActivityFeed() {
           <select
             value={taskFilter}
             onChange={(e) => setTaskFilter(e.target.value)}
-            className="bg-bg border border-border rounded px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-accent max-w-[200px]"
+            className="bg-bg border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50 max-w-[200px]"
           >
             <option value="all">All Tasks</option>
             {taskOptions.map((t) => (
@@ -118,10 +118,10 @@ export function ActivityFeed() {
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto space-y-1"
+        className="flex-1 overflow-auto space-y-0.5"
       >
         {filteredEvents.length === 0 && !loading ? (
-          <div className="text-text-muted text-sm py-8 text-center">
+          <div className="text-text-muted text-sm py-12 text-center">
             No events to show.
           </div>
         ) : (

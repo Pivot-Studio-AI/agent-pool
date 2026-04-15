@@ -22,13 +22,13 @@ function TaskItem({
     <button
       onClick={onClick}
       className={clsx(
-        'w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all',
+        'w-full text-left px-3 py-2 rounded-lg text-sm group',
         isSelected
-          ? 'bg-accent/10 border border-accent/20'
-          : 'hover:bg-surface-hover border border-transparent'
+          ? 'bg-accent/10 shadow-glow-accent'
+          : 'hover:bg-surface-hover'
       )}
     >
-      <div className="truncate text-text-primary text-xs font-medium">
+      <div className="truncate text-text-primary text-xs font-medium group-hover:text-accent">
         {task.title}
       </div>
       <div className="mt-1">
@@ -54,17 +54,17 @@ function Section({
   if (tasks.length === 0) return null;
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-2 px-3 py-1.5">
+    <div className="mb-5">
+      <div className="flex items-center gap-2 px-3 mb-1.5">
         {dotColor && (
-          <span className={clsx('w-2 h-2 rounded-full', dotColor)} />
+          <span className={clsx('w-1.5 h-1.5 rounded-full', dotColor)} />
         )}
-        <span className="text-text-secondary text-xs font-semibold uppercase tracking-wider">
+        <span className="text-text-muted text-[10px] font-bold uppercase tracking-widest">
           {title}
         </span>
-        <span className="text-text-muted text-xs">{tasks.length}</span>
+        <span className="text-text-muted/60 text-[10px] font-mono">{tasks.length}</span>
       </div>
-      <div className="space-y-0.5 px-1">
+      <div className="space-y-0.5 px-1.5">
         {tasks.map((task) => (
           <TaskItem
             key={task.id}
@@ -88,8 +88,8 @@ export function Sidebar() {
   const recent = getRecentTasks(store);
 
   return (
-    <aside className="fixed left-0 top-28 bottom-0 w-64 bg-surface/50 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
-      <div className="py-3">
+    <aside className="fixed left-0 top-14 bottom-0 w-60 bg-surface/40 backdrop-blur-sm border-r border-border overflow-y-auto z-20">
+      <div className="py-4">
         <Section
           title="Needs Attention"
           dotColor="bg-amber"

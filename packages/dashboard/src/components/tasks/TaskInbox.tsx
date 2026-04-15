@@ -1,10 +1,9 @@
-import { Clock, AlertTriangle, Play, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Play, Clock, CheckCircle, ArrowRight } from 'lucide-react';
 import { Card } from '../shared/Card';
-import { Badge } from '../shared/Badge';
+import { TaskStatusBadge } from './TaskStatusBadge';
 import { useTaskStore, getAttentionTasks, getActiveTasks } from '../../stores/task-store';
 import { useEventStore } from '../../stores/event-store';
 import { useSlotStore } from '../../stores/slot-store';
-import { STATUS_COLORS } from '../../lib/constants';
 import type { AppEvent } from '../../lib/types';
 
 function timeAgo(dateStr: string): string {
@@ -80,6 +79,34 @@ function eventDescription(event: AppEvent): string {
   return descriptions[event.event_type] || event.event_type;
 }
 
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  valueColor,
+  glowColor,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  valueColor: string;
+  glowColor?: string;
+}) {
+  return (
+    <Card className={glowColor}>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-hover">
+          <Icon size={16} className="text-text-muted" />
+        </div>
+        <div>
+          <div className="text-[11px] text-text-muted font-medium uppercase tracking-wider">{label}</div>
+          <div className={`text-xl font-bold ${valueColor} font-mono`}>{value}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function TaskInbox() {
   const store = useTaskStore();
   const selectTask = useTaskStore((s) => s.selectTask);
@@ -102,75 +129,51 @@ export function TaskInbox() {
   const recentEvents = events.slice(0, 5);
 
   return (
-    <div className="p-6 space-y-8 max-w-5xl">
+    <div className="p-6 space-y-8 max-w-5xl animate-fade-in">
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-              <AlertTriangle size={14} />
-              <span>Needs Attention</span>
-            </div>
-            <div className="text-2xl font-bold text-amber">{attentionTasks.length}</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-              <Play size={14} />
-              <span>Building</span>
-            </div>
-            <div className="text-2xl font-bold text-green">{activeTasks.length}</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-              <Clock size={14} />
-              <span>Slots Active</span>
-            </div>
-            <div className="text-2xl font-bold text-text-primary">
-              {activeSlots}/{totalSlots}
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4">
-            <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-              <CheckCircle size={14} />
-              <span>Completed Today</span>
-            </div>
-            <div className="text-2xl font-bold text-green">{completedToday}</div>
-          </div>
-        </Card>
+      <div className="grid grid-cols-4 gap-3">
+        <StatCard
+          icon={AlertTriangle}
+          label="Needs Attention"
+          value={attentionTasks.length}
+          valueColor="text-amber"
+          glowColor={attentionTasks.length > 0 ? 'shadow-glow-amber' : undefined}
+        />
+        <StatCard icon={Play} label="Building" value={activeTasks.length} valueColor="text-green" />
+        <StatCard icon={Clock} label="Slots Active" value={`${activeSlots}/${totalSlots}`} valueColor="text-text-primary" />
+        <StatCard icon={CheckCircle} label="Completed Today" value={completedToday} valueColor="text-green" />
       </div>
 
       {/* Needs Your Attention */}
       <section>
-        <h2 className="text-lg font-bold text-text-primary mb-4">Needs Your Attention</h2>
+        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">
+          Needs Your Attention
+        </h2>
         {attentionTasks.length === 0 ? (
-          <div className="text-text-muted text-sm py-4">
+          <div className="text-text-muted text-sm py-6 text-center">
             No tasks need your attention right now.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {attentionTasks.map((task) => (
-              <Card key={task.id} className="cursor-pointer hover:border-accent/50 transition-colors">
-                <button
-                  className="w-full p-4 text-left"
-                  onClick={() => selectTask(task.id)}
-                >
+              <button
+                key={task.id}
+                className="w-full text-left group"
+                onClick={() => selectTask(task.id)}
+              >
+                <Card hover className="group-hover:shadow-card-hover">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-text-primary font-medium">{task.title}</span>
-                      <Badge color={STATUS_COLORS[task.status]?.replace('text-', '') || 'text-secondary'}>
-                        {task.status.replace(/_/g, ' ')}
-                      </Badge>
+                      <span className="text-text-primary font-medium text-sm">{task.title}</span>
+                      <TaskStatusBadge status={task.status} />
                     </div>
-                    <span className="text-text-muted text-xs">{timeAgo(task.created_at)}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-text-muted text-xs font-mono">{timeAgo(task.created_at)}</span>
+                      <ArrowRight size={14} className="text-text-muted opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5" />
+                    </div>
                   </div>
-                </button>
-              </Card>
+                </Card>
+              </button>
             ))}
           </div>
         )}
@@ -178,27 +181,31 @@ export function TaskInbox() {
 
       {/* Recent Activity */}
       <section>
-        <h2 className="text-lg font-bold text-text-primary mb-4">Recent Activity</h2>
+        <h2 className="text-sm font-bold text-text-secondary uppercase tracking-wider mb-3">
+          Recent Activity
+        </h2>
         {recentEvents.length === 0 ? (
-          <div className="text-text-muted text-sm py-4">No recent activity.</div>
+          <div className="text-text-muted text-sm py-6 text-center">No recent activity.</div>
         ) : (
-          <div className="space-y-2">
-            {recentEvents.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 py-2">
-                <span className="text-text-muted text-xs w-16 shrink-0">
-                  {timeAgo(event.created_at)}
-                </span>
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    EVENT_DOT_COLORS[event.event_type] || 'bg-text-muted'
-                  }`}
-                />
-                <span className="text-text-secondary text-sm">
-                  {eventDescription(event)}
-                </span>
-              </div>
-            ))}
-          </div>
+          <Card>
+            <div className="divide-y divide-border-subtle">
+              {recentEvents.map((event) => (
+                <div key={event.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <span className="text-text-muted text-[11px] w-14 shrink-0 font-mono">
+                    {timeAgo(event.created_at)}
+                  </span>
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      EVENT_DOT_COLORS[event.event_type] || 'bg-text-muted'
+                    }`}
+                  />
+                  <span className="text-text-secondary text-sm">
+                    {eventDescription(event)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
       </section>
     </div>

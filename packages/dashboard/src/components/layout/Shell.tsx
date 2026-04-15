@@ -44,7 +44,7 @@ export function Shell({ isConnected }: ShellProps) {
     <div className="min-h-screen bg-bg text-text-primary">
       <Header isConnected={isConnected} />
       <Sidebar />
-      <main className="ml-64 pt-28 min-h-screen">
+      <main className="ml-60 pt-14 min-h-screen">
         {selectedTaskId ? (
           <TaskDetail />
         ) : (

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, DragEvent } from 'react';
-import { ChevronDown, ChevronRight, Paperclip, Upload, X, Image } from 'lucide-react';
+import { ChevronDown, ChevronRight, Paperclip, X, Image, Send } from 'lucide-react';
 import { useTaskStore } from '../../stores/task-store';
 import { Button } from '../shared/Button';
 
@@ -19,7 +19,7 @@ export function TaskCreator() {
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleInputRef = useRef<HTMLTextAreaElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const addAttachmentRef = useRef<(file: File) => void>(() => {});
   const createTask = useTaskStore((s) => s.createTask);
 
@@ -158,65 +158,76 @@ export function TaskCreator() {
   };
 
   return (
-    <div className="flex-1 max-w-2xl mx-4">
+    <div className="flex-1 max-w-xl mx-3">
       <div className="relative">
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-text-muted hover:text-text-secondary transition-colors mt-2"
+            className="text-text-muted hover:text-text-secondary p-0.5 rounded"
             aria-label={expanded ? 'Collapse task form' : 'Expand task form'}
           >
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
-          <div className="flex-1 relative">
-            <textarea
+          <div
+            className="flex-1 relative"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <input
               ref={titleInputRef}
+              type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              placeholder="Describe a task... (paste images or drag & drop)"
+              placeholder="Describe a task..."
               disabled={loading}
-              rows={3}
-              className={`w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-all disabled:opacity-50 resize-none ${
-                dragOver ? 'border-accent bg-accent/5' : ''
+              className={`w-full bg-bg/80 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-accent/50 disabled:opacity-50 ${
+                dragOver ? 'border-accent bg-accent/5' : 'border-border'
               }`}
             />
-            <div className="absolute right-2 top-1.5 flex items-center gap-1">
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
               {attachments.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setExpanded(true)}
-                  className="flex items-center gap-1 text-xs text-accent bg-accent/10 px-1.5 py-0.5 rounded hover:bg-accent/20 transition-colors"
+                  className="flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-md hover:bg-accent/20"
                   title="View attached images"
                 >
-                  <Image size={12} />
+                  <Image size={10} />
                   {attachments.length}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-text-muted hover:text-text-secondary transition-colors p-1"
+                className="text-text-muted hover:text-text-secondary p-1 rounded"
                 title="Add image files"
               >
-                <Paperclip size={14} />
+                <Paperclip size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!title.trim() || loading}
+                className="text-accent hover:text-accent/80 p-1 rounded disabled:opacity-30"
+                title="Create task"
+              >
+                <Send size={13} />
               </button>
             </div>
           </div>
         </div>
 
         {expanded && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-lg p-4 space-y-3 z-50 shadow-xl">
+          <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-xl p-4 space-y-3 z-50 shadow-card-hover animate-fade-in">
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs text-text-muted mb-1">Priority</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Priority</label>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent"
+                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -225,20 +236,20 @@ export function TaskCreator() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-text-muted mb-1">Target Branch</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Target Branch</label>
                 <input
                   type="text"
                   value={targetBranch}
                   onChange={(e) => setTargetBranch(e.target.value)}
-                  className="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent"
+                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary font-mono focus:outline-none focus:border-accent/50"
                 />
               </div>
               <div>
-                <label className="block text-xs text-text-muted mb-1">Model Tier</label>
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Model Tier</label>
                 <select
                   value={modelTier}
                   onChange={(e) => setModelTier(e.target.value)}
-                  className="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-accent"
+                  className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent/50"
                 >
                   <option value="default">Default</option>
                   <option value="fast">Fast</option>
@@ -248,20 +259,20 @@ export function TaskCreator() {
             </div>
 
             <div>
-              <label className="block text-xs text-text-muted mb-1">Description</label>
+              <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide more detail about the task..."
                 rows={3}
-                className="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
+                className="w-full bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-accent/50 resize-none"
               />
             </div>
 
-            {/* Attachments Preview — inside expanded panel, not in the header */}
+            {/* Attachments Preview */}
             {attachments.length > 0 && (
               <div>
-                <label className="block text-xs text-text-muted mb-1">
+                <label className="block text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
                   Attachments ({attachments.length})
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -270,18 +281,15 @@ export function TaskCreator() {
                       <img
                         src={attachment.preview}
                         alt={attachment.file.name}
-                        className="w-16 h-16 object-cover rounded border border-border"
+                        className="w-14 h-14 object-cover rounded-lg border border-border"
                       />
                       <button
                         onClick={() => removeAttachment(index)}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100"
                         title="Remove image"
                       >
-                        <X size={12} />
+                        <X size={10} />
                       </button>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 rounded-b truncate">
-                        {attachment.file.name}
-                      </div>
                     </div>
                   ))}
                 </div>

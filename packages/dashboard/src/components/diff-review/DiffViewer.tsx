@@ -12,79 +12,87 @@ const darkThemeOverrides = `
     font-family: 'JetBrains Mono', monospace;
   }
   .d2h-file-header {
-    background-color: #161b22;
-    border-color: #21262d;
-    color: #e6edf3;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+    padding: 8px 12px;
   }
   .d2h-file-name {
-    color: #e6edf3;
+    color: var(--color-text-primary);
+    font-size: 12px;
   }
   .d2h-file-wrapper {
-    border-color: #21262d;
+    border-color: var(--color-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
   }
   .d2h-diff-table {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
+    line-height: 1.5;
   }
   .d2h-code-line,
   .d2h-code-side-line {
-    background-color: #0a0c10;
-    color: #e6edf3;
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
   }
   .d2h-code-line-ctn {
-    color: #e6edf3;
+    color: var(--color-text-primary);
   }
   .d2h-del {
-    background-color: rgba(248, 81, 73, 0.15);
-    border-color: rgba(248, 81, 73, 0.4);
+    background-color: rgba(248, 113, 113, 0.08);
+    border-color: rgba(248, 113, 113, 0.2);
   }
   .d2h-del .d2h-code-line-ctn {
-    color: #e6edf3;
+    color: var(--color-text-primary);
   }
   .d2h-del del {
-    background-color: rgba(248, 81, 73, 0.4);
-    color: #e6edf3;
+    background-color: rgba(248, 113, 113, 0.3);
+    color: var(--color-text-primary);
   }
   .d2h-ins {
-    background-color: rgba(63, 185, 80, 0.15);
-    border-color: rgba(63, 185, 80, 0.4);
+    background-color: rgba(52, 211, 153, 0.08);
+    border-color: rgba(52, 211, 153, 0.2);
   }
   .d2h-ins .d2h-code-line-ctn {
-    color: #e6edf3;
+    color: var(--color-text-primary);
   }
   .d2h-ins ins {
-    background-color: rgba(63, 185, 80, 0.4);
-    color: #e6edf3;
+    background-color: rgba(52, 211, 153, 0.3);
+    color: var(--color-text-primary);
   }
   .d2h-info {
-    background-color: rgba(88, 166, 255, 0.1);
-    border-color: #21262d;
-    color: #8b949e;
+    background-color: rgba(108, 140, 255, 0.06);
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 11px;
   }
   .d2h-code-linenumber {
-    background-color: #161b22;
-    border-color: #21262d;
-    color: #484f58;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 11px;
   }
   .d2h-emptyplaceholder,
   .d2h-code-side-emptyplaceholder {
-    background-color: #161b22;
-    border-color: #21262d;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
   }
   .d2h-file-diff .d2h-del.d2h-change,
   .d2h-file-diff .d2h-ins.d2h-change {
-    background-color: rgba(210, 153, 34, 0.15);
+    background-color: rgba(251, 191, 36, 0.08);
   }
   .d2h-tag {
-    background-color: #161b22;
-    border-color: #21262d;
-    color: #8b949e;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
   }
   .d2h-file-stats .d2h-lines-added {
-    color: #3fb950;
+    color: var(--color-green);
   }
   .d2h-file-stats .d2h-lines-deleted {
-    color: #f85149;
+    color: var(--color-red);
   }
 `;
 
@@ -107,7 +115,7 @@ export function DiffViewer({ diffContent, viewMode }: DiffViewerProps) {
     <div className="diff-viewer-container">
       <style>{darkThemeOverrides}</style>
       <div
-        className="overflow-auto rounded border border-border"
+        className="overflow-auto rounded-xl shadow-card"
         dangerouslySetInnerHTML={{ __html: diffHtml }}
       />
     </div>

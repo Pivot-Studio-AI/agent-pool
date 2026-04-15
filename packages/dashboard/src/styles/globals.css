@@ -4,20 +4,26 @@
 
 /* Dark theme (default) */
 :root, .dark {
-  --color-bg: #0f1117;
-  --color-surface: #1a1d27;
-  --color-surface-hover: #222632;
-  --color-border: #2a2e3a;
-  --color-text-primary: #f0f2f5;
-  --color-text-secondary: #9ca3b0;
-  --color-text-muted: #5c6370;
+  --color-bg: #0b0d14;
+  --color-surface: #12151e;
+  --color-surface-hover: #1a1e2e;
+  --color-border: #1e2233;
+  --color-border-subtle: #161a28;
+  --color-text-primary: #eef1f6;
+  --color-text-secondary: #8a92a6;
+  --color-text-muted: #4a5168;
   --color-accent: #6c8cff;
-  --color-green: #4ade80;
+  --color-accent-glow: rgba(108, 140, 255, 0.12);
+  --color-green: #34d399;
+  --color-green-glow: rgba(52, 211, 153, 0.12);
   --color-amber: #fbbf24;
+  --color-amber-glow: rgba(251, 191, 36, 0.10);
   --color-red: #f87171;
+  --color-red-glow: rgba(248, 113, 113, 0.10);
   --color-purple: #a78bfa;
-  --scrollbar-thumb: #2a2e3a;
-  --scrollbar-thumb-hover: #5c6370;
+  --color-purple-glow: rgba(167, 139, 250, 0.12);
+  --scrollbar-thumb: #1e2233;
+  --scrollbar-thumb-hover: #4a5168;
 }
 
 /* Light theme */
@@ -25,15 +31,21 @@
   --color-bg: #f5f6f8;
   --color-surface: #ffffff;
   --color-surface-hover: #eef0f4;
-  --color-border: #d1d5db;
+  --color-border: #e2e5eb;
+  --color-border-subtle: #eef0f4;
   --color-text-primary: #1a1d27;
   --color-text-secondary: #4b5563;
   --color-text-muted: #9ca3af;
   --color-accent: #4f6de8;
+  --color-accent-glow: rgba(79, 109, 232, 0.08);
   --color-green: #22c55e;
+  --color-green-glow: rgba(34, 197, 94, 0.08);
   --color-amber: #d97706;
+  --color-amber-glow: rgba(217, 119, 6, 0.06);
   --color-red: #ef4444;
+  --color-red-glow: rgba(239, 68, 68, 0.06);
   --color-purple: #7c3aed;
+  --color-purple-glow: rgba(124, 58, 237, 0.08);
   --scrollbar-thumb: #d1d5db;
   --scrollbar-thumb-hover: #9ca3af;
 }
@@ -52,5 +64,33 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
-/* Smooth transitions */
-* { transition-property: background-color, border-color, color, opacity; transition-duration: 150ms; }
+/* Smooth transitions on interactive elements only */
+button, a, input, select, textarea, [role="button"] {
+  transition-property: background-color, border-color, color, opacity, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle glow on focus */
+input:focus, select:focus, textarea:focus {
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+/* Keyframes */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
