@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bot, Github, Key, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../stores/auth-store';
+import { ThemeToggle } from '../layout/ThemeToggle';
 
 export function LoginScreen() {
   const login = useAuthStore((s) => s.login);
@@ -31,6 +32,7 @@ export function LoginScreen() {
           </span>
         </div>
         <div className="flex-1" />
+        <ThemeToggle />
         <button
           onClick={login}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-hover border border-border text-text-primary hover:border-text-muted/30 hover:bg-surface-raised active:scale-[0.97]"

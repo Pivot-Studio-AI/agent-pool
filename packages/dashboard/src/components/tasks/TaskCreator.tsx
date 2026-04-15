@@ -19,7 +19,7 @@ export function TaskCreator() {
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const addAttachmentRef = useRef<(file: File) => void>(() => {});
   const createTask = useTaskStore((s) => s.createTask);
 
@@ -158,7 +158,7 @@ export function TaskCreator() {
   };
 
   return (
-    <div className="flex-1 max-w-2xl mx-3">
+    <div className="flex-1 max-w-4xl mx-3">
       <div className="relative">
         <div className="flex items-center gap-1.5">
           <button
@@ -174,15 +174,20 @@ export function TaskCreator() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <input
+            <textarea
               ref={titleInputRef}
-              type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                // Auto-resize
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Describe a task..."
               disabled={loading}
-              className={`w-full bg-bg border pl-3 pr-20 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent disabled:opacity-50 ${
+              rows={1}
+              className={`w-full bg-bg border pl-3 pr-20 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent disabled:opacity-50 resize-none ${
                 dragOver ? 'border-accent bg-accent/5' : 'border-border'
               }`}
             />
@@ -264,7 +269,7 @@ export function TaskCreator() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide more detail about the task..."
-                rows={4}
+                rows={6}
                 className="w-full bg-bg border border-border px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
               />
             </div>
