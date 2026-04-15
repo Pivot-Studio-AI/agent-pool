@@ -146,7 +146,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   selectRepo: async (fullName: string, githubUrl: string, defaultBranch: string) => {
     try {
       const repo = await api.post<Repository>('/repos/select', {
-        github_full_name: fullName,
+        full_name: fullName,
         github_url: githubUrl,
         default_branch: defaultBranch,
       });
