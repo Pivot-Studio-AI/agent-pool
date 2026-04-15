@@ -97,7 +97,7 @@ describe('TaskDetail time utilities', () => {
 });
 
 describe('CancelButton cancellable statuses', () => {
-  const cancellableStatuses = ['queued', 'planning', 'awaiting_approval', 'executing', 'awaiting_review'];
+  const cancellableStatuses = ['queued', 'planning', 'awaiting_approval', 'executing', 'awaiting_review', 'merging'];
 
   it('should include all expected cancellable statuses', () => {
     expect(cancellableStatuses).toContain('queued');
@@ -105,6 +105,7 @@ describe('CancelButton cancellable statuses', () => {
     expect(cancellableStatuses).toContain('awaiting_approval');
     expect(cancellableStatuses).toContain('executing');
     expect(cancellableStatuses).toContain('awaiting_review');
+    expect(cancellableStatuses).toContain('merging');
   });
 
   it('should not include completed status', () => {
@@ -121,5 +122,44 @@ describe('CancelButton cancellable statuses', () => {
 
   it('should not include cancelled status', () => {
     expect(cancellableStatuses).not.toContain('cancelled');
+  });
+});
+
+describe('TaskDetail CompletedView structure', () => {
+  const { readFileSync } = require('fs');
+  const { resolve } = require('path');
+  const source = readFileSync(resolve(__dirname, 'TaskDetail.tsx'), 'utf-8');
+
+  it('imports and uses TaskTimeline component', () => {
+    expect(source).toContain("import { TaskTimeline } from './TaskTimeline'");
+    expect(source).toContain('<TaskTimeline taskId={task.id}');
+  });
+
+  it('CompletedView handles cancelled status', () => {
+    expect(source).toContain("case 'cancelled':");
+    expect(source).toContain("'Task Cancelled'");
+  });
+
+  it('CompletedView fetches task-specific events for error details', () => {
+    expect(source).toContain('api.get<AppEvent[]>(`/events?task_id=${task.id}&limit=100`)');
+  });
+
+  it('CompletedView fetches plans for rejection feedback on rejected tasks', () => {
+    expect(source).toContain("if (task.status === 'rejected')");
+    expect(source).toContain('api.get<Plan[]>(`/tasks/${task.id}/plans`)');
+  });
+
+  it('CompletedView deduplicates events from store and fetched', () => {
+    expect(source).toContain('Deduplicate by id');
+    expect(source).toContain('const seen = new Set<string>()');
+  });
+
+  it('includes RetryButton for errored/cancelled/rejected tasks', () => {
+    expect(source).toContain("const retryableStatuses = ['errored', 'cancelled', 'rejected']");
+  });
+
+  it('routes deploying status to DeployingView', () => {
+    expect(source).toContain("case 'deploying':");
+    expect(source).toContain('<DeployingView');
   });
 });

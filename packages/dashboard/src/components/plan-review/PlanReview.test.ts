@@ -50,3 +50,37 @@ describe('PlanReview layout structure', () => {
     expect(controlsBlock).toContain('loading={actionLoading}');
   });
 });
+
+describe('PlanReview plan attempt counter', () => {
+  it('tracks planAttempt as plans.length', () => {
+    expect(source).toContain('const planAttempt = plans.length');
+  });
+
+  it('sets maxPlanRetries to 5', () => {
+    expect(source).toContain('const maxPlanRetries = 5');
+  });
+
+  it('shows plan attempt badge only when planAttempt > 1', () => {
+    expect(source).toContain('planAttempt > 1');
+    expect(source).toContain('Plan attempt {planAttempt}/{maxPlanRetries}');
+  });
+});
+
+describe('PlanReview previous rejection feedback', () => {
+  it('filters plans for rejected status with reviewer_feedback', () => {
+    expect(source).toContain("plans.filter((p) => p.status === 'rejected' && p.reviewer_feedback)");
+  });
+
+  it('renders rejection feedback section when previousRejections exist', () => {
+    expect(source).toContain('previousRejections.length > 0');
+    expect(source).toContain('Previous Rejection Feedback');
+  });
+
+  it('shows plan number in rejection header', () => {
+    expect(source).toContain('Plan {i + 1} Rejected');
+  });
+
+  it('displays reviewer_feedback text', () => {
+    expect(source).toContain('{p.reviewer_feedback}');
+  });
+});
