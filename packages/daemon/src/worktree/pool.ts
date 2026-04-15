@@ -26,6 +26,11 @@ export class WorktreePool {
       fs.mkdirSync(this.worktreesDir, { recursive: true });
     }
 
+    // Prune stale worktree registrations (directories removed without git worktree remove)
+    try {
+      execFileSync('git', ['-C', this.repoPath, 'worktree', 'prune'], { stdio: 'pipe' });
+    } catch { /* best effort */ }
+
     const existingWorktrees = listWorktrees(this.repoPath);
     const existingPaths = new Set(existingWorktrees.map((wt) => wt.path));
 
@@ -53,6 +58,9 @@ export class WorktreePool {
       // If directory exists but is not a registered worktree, remove it first
       if (fs.existsSync(wtPath)) {
         console.warn(`[pool] Slot ${i}: stale directory at ${wtPath}, removing...`);
+        try {
+          execFileSync('git', ['-C', this.repoPath, 'worktree', 'remove', '--force', wtPath], { stdio: 'pipe' });
+        } catch { /* may not be registered — that's ok */ }
         fs.rmSync(wtPath, { recursive: true, force: true });
       }
 
