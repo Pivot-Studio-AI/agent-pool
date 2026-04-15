@@ -69,10 +69,18 @@ export interface FileLock {
 }
 
 export interface Repo {
-  repo_id: string;
+  id?: string;        // raw DB column name (before server aliases it)
+  repo_id?: string;  // aliased by server endpoints
   github_full_name: string;
   github_url: string;
   default_branch: string;
+}
+
+/** Returns the canonical repo ID regardless of which field the server returned. */
+export function repoId(repo: Repo): string {
+  const id = repo.repo_id ?? repo.id;
+  if (!id) throw new Error(`Repo ${repo.github_full_name} has no id`);
+  return id;
 }
 
 // ---- Retry helper ----
@@ -366,8 +374,7 @@ export async function ackRepo(
       local_path: localPath,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (!msg.includes('404')) throw err;
-    // 404 means server not yet deployed with this endpoint — safe to ignore
+    // ackRepo is informational only — never block repo activation
+    console.warn('[api] ackRepo failed (non-fatal):', err instanceof Error ? err.message : err);
   }
 }

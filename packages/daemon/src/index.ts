@@ -277,11 +277,12 @@ async function runDynamicMode(): Promise<void> {
   const managedRepos = new Map<string, () => void>();
 
   async function activateRepo(repo: api.Repo): Promise<void> {
+    const id = api.repoId(repo);
     const repoPath = ensureRepo(repo.github_full_name, repo.github_url, config.reposBaseDir);
     const defaultBranch = repo.default_branch || config.defaultBranch;
 
-    await api.ackRepo(daemonId, repo.repo_id, repoPath);
-    await api.ensureRepoSlots(repo.repo_id, config.poolSize, repoPath);
+    await api.ackRepo(daemonId, id, repoPath);
+    await api.ensureRepoSlots(id, config.poolSize, repoPath);
 
     const pool = new WorktreePool(repoPath, config.poolSize, defaultBranch);
     await pool.provision();
@@ -289,10 +290,10 @@ async function runDynamicMode(): Promise<void> {
     const stopPolling = startPolling(config.pollIntervalMs, async () => {
       if (shuttingDown) return;
       try {
-        const tasks = await api.getQueuedTasks(repo.repo_id);
+        const tasks = await api.getQueuedTasks(id);
         if (!tasks.length) return;
 
-        const idleSlots = await api.getIdleSlots(repo.repo_id);
+        const idleSlots = await api.getIdleSlots(id);
         if (!idleSlots.length) return;
 
         const task = tasks[0];
@@ -318,7 +319,7 @@ async function runDynamicMode(): Promise<void> {
       }
     });
 
-    managedRepos.set(repo.repo_id, stopPolling);
+    managedRepos.set(id, stopPolling);
     console.log(`[daemon] Activated repo: ${repo.github_full_name} (${config.poolSize} slots)`);
   }
 
@@ -328,7 +329,7 @@ async function runDynamicMode(): Promise<void> {
     try {
       const repos = await api.getAllRepos();
       for (const repo of repos) {
-        if (!managedRepos.has(repo.repo_id)) {
+        if (!managedRepos.has(api.repoId(repo))) {
           await activateRepo(repo).catch((err) => {
             console.error(`[daemon] Failed to activate ${repo.github_full_name}:`, err instanceof Error ? err.message : err);
           });
