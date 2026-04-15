@@ -362,6 +362,16 @@ export async function getCurrentRepo(): Promise<Repo | null> {
  * Acknowledge that the daemon has set up the repo locally.
  * Non-fatal — server may not have this endpoint yet.
  */
+export async function recoverOrphanedTasks(repoId?: string): Promise<number> {
+  try {
+    const result = await request<{ recovered: number }>('POST', '/daemon/recover', { repo_id: repoId });
+    return result.recovered;
+  } catch (err) {
+    console.warn('[api] recoverOrphanedTasks failed (non-fatal):', err instanceof Error ? err.message : err);
+    return 0;
+  }
+}
+
 export async function ackRepo(
   daemonId: string,
   repoId: string,

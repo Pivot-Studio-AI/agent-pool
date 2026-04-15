@@ -286,6 +286,12 @@ async function runDynamicMode(): Promise<void> {
     await api.ackRepo(daemonId, id, repoPath);
     await api.ensureRepoSlots(id, config.poolSize, repoPath);
 
+    // Recover tasks orphaned by a previous daemon crash/restart
+    const recovered = await api.recoverOrphanedTasks(id);
+    if (recovered > 0) {
+      console.log(`[daemon] Recovered ${recovered} orphaned task(s) for ${repo.github_full_name}`);
+    }
+
     const pool = new WorktreePool(repoPath, config.poolSize, defaultBranch);
     await pool.provision();
 

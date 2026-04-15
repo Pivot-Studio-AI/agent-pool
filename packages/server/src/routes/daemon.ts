@@ -35,14 +35,16 @@ daemonRouter.post('/register', async (req, res, next) => {
     );
     const daemon = daemonResult.rows[0];
 
-    // Auto-create slots for this daemon
+    // Auto-create slots for this daemon — preserve status for active/claimed slots on restart
     const slotRows = [];
     for (let i = 1; i <= data.pool_size; i++) {
       const worktreePath = `${data.repo_path}/.worktrees/slot-${i}`;
       const slotResult = await query(
         `INSERT INTO slots (slot_number, worktree_path, status, repo_id)
          VALUES ($1, $2, 'idle', $3)
-         ON CONFLICT (slot_number, repo_id) DO UPDATE SET worktree_path = $2, status = 'idle'
+         ON CONFLICT (slot_number, repo_id) DO UPDATE
+           SET worktree_path = EXCLUDED.worktree_path,
+               status = CASE WHEN slots.status IN ('claimed', 'active') THEN slots.status ELSE 'idle' END
          RETURNING *`,
         [i, worktreePath, data.repo_id ?? null],
       );
@@ -128,7 +130,9 @@ daemonRouter.post('/repo-slots', async (req, res, next) => {
       const slotResult = await query(
         `INSERT INTO slots (slot_number, worktree_path, status, repo_id)
          VALUES ($1, $2, 'idle', $3)
-         ON CONFLICT (slot_number, repo_id) DO UPDATE SET worktree_path = $2, status = 'idle'
+         ON CONFLICT (slot_number, repo_id) DO UPDATE
+           SET worktree_path = EXCLUDED.worktree_path,
+               status = CASE WHEN slots.status IN ('claimed', 'active') THEN slots.status ELSE 'idle' END
          RETURNING *`,
         [i, worktreePath, repo_id],
       );
@@ -136,6 +140,40 @@ daemonRouter.post('/repo-slots', async (req, res, next) => {
     }
 
     res.status(201).json({ data: slotRows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /daemon/recover — Reset orphaned executing/planning tasks to queued
+// Called by daemon on startup to recover tasks stranded by a previous crash/restart
+// ---------------------------------------------------------------------------
+daemonRouter.post('/recover', async (req, res, next) => {
+  try {
+    const { repo_id } = z.object({ repo_id: z.string().uuid().optional() }).parse(req.body);
+
+    // Tasks stuck in executing/planning with no active slot
+    const result = await query(
+      `UPDATE tasks
+       SET status = 'queued', updated_at = now()
+       WHERE status IN ('executing', 'planning')
+         AND ($1::uuid IS NULL OR repo_id = $1)
+         AND id NOT IN (
+           SELECT current_task_id FROM slots
+           WHERE current_task_id IS NOT NULL
+             AND status IN ('claimed', 'active')
+         )
+       RETURNING id, title, status`,
+      [repo_id ?? null],
+    );
+
+    if (result.rowCount && result.rowCount > 0) {
+      console.log(`[recover] Reset ${result.rowCount} orphaned task(s) to queued:`,
+        result.rows.map((r: { id: string; title: string }) => r.id.slice(0, 8)).join(', '));
+    }
+
+    res.json({ data: { recovered: result.rowCount ?? 0, tasks: result.rows } });
   } catch (err) {
     next(err);
   }
