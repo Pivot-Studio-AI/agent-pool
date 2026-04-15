@@ -55,6 +55,7 @@ const updateTaskSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   priority: z.string().optional(),
+  repo_id: z.string().uuid().optional(),
 });
 
 const listTasksQuerySchema = z.object({
