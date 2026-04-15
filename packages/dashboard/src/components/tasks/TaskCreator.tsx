@@ -182,7 +182,7 @@ export function TaskCreator() {
               onKeyDown={handleKeyDown}
               placeholder="Describe a task..."
               disabled={loading}
-              className={`w-full bg-bg/60 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:bg-bg/80 disabled:opacity-50 ${
+              className={`w-full bg-bg/60 border rounded-lg pl-3 pr-20 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent/40 focus:bg-bg/80 disabled:opacity-50 ${
                 dragOver ? 'border-accent bg-accent/5' : 'border-border/60'
               }`}
             />
@@ -265,7 +265,7 @@ export function TaskCreator() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide more detail about the task..."
                 rows={3}
-                className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 resize-none"
+                className="w-full bg-bg border border-border/60 rounded-lg px-2 py-1.5 text-xs text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent/40 resize-none"
               />
             </div>
 
