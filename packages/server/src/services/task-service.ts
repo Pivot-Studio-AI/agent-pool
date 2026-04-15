@@ -59,6 +59,7 @@ export interface UpdateTaskFields {
   title?: string;
   description?: string;
   priority?: string;
+  repo_id?: string;
 }
 
 // ─── State Machine ───────────────────────────────────────────────────
@@ -388,6 +389,11 @@ export async function updateTask(id: string, fields: UpdateTaskFields): Promise<
   if (fields.priority !== undefined) {
     setClauses.push(`priority = $${paramIdx++}`);
     params.push(fields.priority);
+  }
+
+  if (fields.repo_id !== undefined) {
+    setClauses.push(`repo_id = $${paramIdx++}`);
+    params.push(fields.repo_id);
   }
 
   if (setClauses.length === 0) {
