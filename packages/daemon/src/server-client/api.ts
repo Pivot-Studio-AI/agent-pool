@@ -352,15 +352,22 @@ export async function getCurrentRepo(): Promise<Repo | null> {
 
 /**
  * Acknowledge that the daemon has set up the repo locally.
+ * Non-fatal — server may not have this endpoint yet.
  */
 export async function ackRepo(
   daemonId: string,
   repoId: string,
   localPath: string
 ): Promise<void> {
-  await request('POST', '/daemon/repo/ack', {
-    daemon_id: daemonId,
-    repo_id: repoId,
-    local_path: localPath,
-  });
+  try {
+    await request('POST', '/daemon/repo/ack', {
+      daemon_id: daemonId,
+      repo_id: repoId,
+      local_path: localPath,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes('404')) throw err;
+    // 404 means server not yet deployed with this endpoint — safe to ignore
+  }
 }

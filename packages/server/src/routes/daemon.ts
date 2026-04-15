@@ -56,6 +56,28 @@ daemonRouter.post('/register', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /daemon/repo/ack — Daemon acknowledges it has a repo set up locally
+// ---------------------------------------------------------------------------
+daemonRouter.post('/repo/ack', async (req, res, next) => {
+  try {
+    const { daemon_id, repo_id, local_path } = z.object({
+      daemon_id: z.string().uuid(),
+      repo_id: z.string().uuid(),
+      local_path: z.string().min(1),
+    }).parse(req.body);
+
+    await query(
+      `UPDATE daemons SET repo_id = $1, repo_path = $2 WHERE id = $3`,
+      [repo_id, local_path, daemon_id],
+    );
+
+    res.json({ data: { ok: true } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /daemon/repo — Get latest selected repository
 // ---------------------------------------------------------------------------
 daemonRouter.get('/repo', async (_req, res, next) => {
