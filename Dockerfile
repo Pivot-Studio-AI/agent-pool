@@ -15,7 +15,7 @@ COPY tsconfig.base.json ./
 COPY packages/dashboard/ packages/dashboard/
 RUN npm run build -w packages/dashboard
 
-# Build server (bust cache: v2)
+# Build server (bust cache: v3)
 COPY packages/server/ packages/server/
 
 # Production stage
