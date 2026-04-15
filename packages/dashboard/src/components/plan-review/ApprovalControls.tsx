@@ -73,7 +73,7 @@ export function ApprovalControls({
           placeholder="Explain why you're rejecting this plan and what changes you'd like..."
           rows={4}
           autoFocus
-          className="w-full bg-bg border border-border/60 rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 resize-none"
+          className="w-full bg-surface border border-border/60 rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 resize-none"
         />
       )}
     </div>
